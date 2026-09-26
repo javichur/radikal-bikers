@@ -47,6 +47,19 @@ describe('roundCorners', () => {
     expect(1 / maxK).toBeLessThan(70);
     expect(t.sample(t.length).heading).toBeCloseTo(Math.PI / 2, 1);
   });
+
+  it('keeps straight or degenerate corners as plain vertices', () => {
+    const pts = roundCorners(
+      [
+        [0, 1330],
+        [0, 2000],
+        [0, 2060],
+      ],
+      60,
+    );
+    expect(pts.every((p) => p.every(Number.isFinite))).toBe(true);
+    expect(new Track(pts).length).toBeGreaterThan(0);
+  });
 });
 
 describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) => {

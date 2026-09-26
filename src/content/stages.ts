@@ -88,13 +88,21 @@ export const roundCorners = (points: readonly P2[], radius: number): P3[] => {
     const [nx, nz] = points[i + 1]!;
     const la = Math.hypot(px - vx, pz - vz);
     const lc = Math.hypot(nx - vx, nz - vz);
+    if (la === 0 || lc === 0) {
+      path.push(points[i]!);
+      continue;
+    }
     const ax = (px - vx) / la;
     const az = (pz - vz) / la;
     const cx = (nx - vx) / lc;
     const cz = (nz - vz) / lc;
     const theta = Math.acos(Math.max(-1, Math.min(1, ax * cx + az * cz)));
-    const t = radius / Math.tan(theta / 2);
     const bl = Math.hypot(ax + cx, az + cz);
+    if (bl < 1e-6 || theta < 1e-6) {
+      path.push(points[i]!);
+      continue;
+    }
+    const t = radius / Math.tan(theta / 2);
     const ox = vx + ((ax + cx) / bl) * (radius / Math.sin(theta / 2));
     const oz = vz + ((az + cz) / bl) * (radius / Math.sin(theta / 2));
     const a1 = Math.atan2(vz + az * t - oz, vx + ax * t - ox);
