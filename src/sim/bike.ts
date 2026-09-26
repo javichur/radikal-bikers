@@ -119,8 +119,7 @@ export const launchBike = (b: BikeState, events: SimEvent[]): void => {
 };
 
 /** True when a wheelie is high enough to hop over a vehicle instead of crashing into it. */
-export const canHop = (b: BikeState): boolean =>
-  b.wheelie >= BIKE.wheelieHopMin && !b.airborne && b.crashTimer <= 0;
+export const canHop = (b: BikeState): boolean => b.wheelie >= BIKE.wheelieHopMin && !b.airborne && b.crashTimer <= 0;
 
 /**
  * Pops the bike over a vehicle from a wheelie: it lifts onto the vehicle's roof line and
