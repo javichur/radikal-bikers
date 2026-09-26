@@ -85,4 +85,27 @@ describe('city builder', () => {
       expect(size.z).toBeLessThan(VEHICLES[kind].length * 1.1);
     }
   });
+
+  it('lights up traffic vehicles only at night', () => {
+    const glows = (g: THREE.Object3D): number => g.children.filter((c) => c.name === 'nightGlow').length;
+    for (const kind of VEHICLE_KINDS) {
+      expect(glows(buildVehicle(kind, 1))).toBe(0);
+      expect(glows(buildVehicle(kind, 1, true))).toBe(2);
+    }
+  });
+
+  it('adds street lamp, tunnel and shop window light only to night stages', () => {
+    const additive = (root: THREE.Object3D): number => {
+      let n = 0;
+      root.traverse((o) => {
+        if (o instanceof THREE.Mesh && (o.material as THREE.Material).blending === THREE.AdditiveBlending) n++;
+      });
+      return n;
+    };
+    for (const stage of STAGES) {
+      const n = additive(buildCity(new World(stage, CHARACTERS[0]!)).root);
+      if (stage.theme.night) expect(n).toBeGreaterThan(3);
+      else expect(n).toBe(0);
+    }
+  });
 });
