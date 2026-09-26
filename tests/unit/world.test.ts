@@ -25,6 +25,23 @@ describe('World', () => {
     expect(a.traffic.vehicles.map((v) => v.s)).toEqual(b.traffic.vehicles.map((v) => v.s));
   });
 
+  it('warns the rider when he turns round and rides against the course', () => {
+    const w = newWorld();
+    w.traffic.vehicles.length = 0;
+    w.bike.s = 200;
+    w.bike.speed = 10;
+    run(w, 1, controls({ throttle: 0.5 }));
+    expect(w.wrongWay).toBe(false);
+    w.bike.yaw = Math.PI;
+    run(w, 0.2, controls({ throttle: 0.5 }));
+    expect(w.wrongWay).toBe(false); // not straight away
+    run(w, 0.6, controls({ throttle: 0.5 }));
+    expect(w.wrongWay).toBe(true);
+    w.bike.yaw = 0;
+    run(w, 0.1, controls({ throttle: 0.5 }));
+    expect(w.wrongWay).toBe(false);
+  });
+
   it('launches off ramps', () => {
     const w = newWorld();
     const ramp = w.ramps[0]!;

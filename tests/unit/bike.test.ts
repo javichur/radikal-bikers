@@ -6,6 +6,7 @@ import {
   createBike,
   crashBike,
   effectiveTopSpeed,
+  facingBackwards,
   launchBike,
   stepBike,
   type BikeState,
@@ -126,6 +127,33 @@ describe('bike physics', () => {
     expect(b.crashes).toBe(0);
     expect(b.speed).toBeLessThan(30);
     expect(b.speed).toBeGreaterThan(10);
+    expect(b.d).toBeLessThanOrEqual(12 - BIKE.wallMargin);
+  });
+
+  it('can turn fully round and ride against the course', () => {
+    const b = createBike(500, 0);
+    b.speed = 8;
+    const wide = { curvature: 0, roadHalfWidth: 200 };
+    for (let i = 0; i < 600 && !facingBackwards(b.yaw); i++)
+      sim(b, FIXED_DT, controls({ throttle: 0.3, steer: 1 }), wide);
+    expect(facingBackwards(b.yaw)).toBe(true);
+    sim(b, 1.5, controls({ throttle: 0.3, steer: 1 }), wide);
+    expect(Math.abs(b.yaw)).toBeLessThanOrEqual(Math.PI);
+    // Straightens up going the wrong way instead of swinging back forwards.
+    b.yaw = Math.PI - 0.2;
+    const s0 = b.s;
+    sim(b, 3, controls({ throttle: 1 }), wide);
+    expect(facingBackwards(b.yaw)).toBe(true);
+    expect(Math.abs(b.yaw)).toBeGreaterThan(Math.PI - 0.2);
+    expect(b.s).toBeLessThan(s0);
+  });
+
+  it('bounces off walls keeping the way it faces when riding backwards', () => {
+    const b = createBike(500, 10);
+    b.speed = 30;
+    b.yaw = Math.PI - 1;
+    sim(b, 0.3);
+    expect(facingBackwards(b.yaw)).toBe(true);
     expect(b.d).toBeLessThanOrEqual(12 - BIKE.wallMargin);
   });
 

@@ -32,6 +32,20 @@ test.describe('desktop', () => {
     await expect(page.locator('.touch-controls')).toBeHidden();
   });
 
+  test('warns when riding against the course', async ({ page }) => {
+    await page.goto('./?e2e&quality=low');
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Enter');
+    await expect(screen(page)).toHaveAttribute('data-screen', 'racing', { timeout: 30_000 });
+    await expect(page.getByTestId('hud-wrongway')).not.toHaveClass(/show/);
+    await page.evaluate(() => {
+      const rr = (window as unknown as { __RR__: { game: { world: { bike: { s: number; yaw: number } } } } }).__RR__;
+      rr.game.world.bike.s = 300;
+      rr.game.world.bike.yaw = Math.PI;
+    });
+    await expect(page.getByTestId('hud-wrongway')).toHaveClass(/show/);
+    await expect(page.getByTestId('hud-wrongway')).toContainText(/wrong way|sentido contrario/i);
+  });
+
   test('pause menu and quit to title', async ({ page }) => {
     await page.goto('./?e2e&quality=low');
     for (let i = 0; i < 3; i++) await page.keyboard.press('Enter');

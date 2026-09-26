@@ -41,6 +41,9 @@ export class Hud {
   private readonly ghostMark: HTMLElement;
   private readonly split: HTMLElement;
   private readonly speedLines: HTMLElement;
+  private readonly wrongWay: HTMLElement;
+  private readonly wrongWayTitle: HTMLElement;
+  private readonly wrongWayHint: HTMLElement;
   private bannerTimer = 0;
   private trickTimer = 0;
   private splitTimer = 0;
@@ -99,6 +102,15 @@ export class Hud {
     this.ghostMark = h('span', { class: 'hud-progress-ghost' });
     this.split = h('div', { class: 'hud-split' });
     this.speedLines = h('div', { class: 'hud-speedlines' });
+    this.wrongWayTitle = h('span', { class: 'hud-wrongway-title' });
+    this.wrongWayHint = h('span', { class: 'hud-wrongway-hint' });
+    this.wrongWay = h(
+      'div',
+      { class: 'hud-wrongway', 'data-testid': 'hud-wrongway' },
+      h('span', { class: 'hud-wrongway-icon' }, '⛔'),
+      this.wrongWayTitle,
+      this.wrongWayHint,
+    );
     this.pauseButton = h(
       'button',
       { class: 'hud-pause', type: 'button', 'aria-label': 'Pause', onclick: onPause },
@@ -137,6 +149,7 @@ export class Hud {
       this.trick,
       this.explosive,
       this.turbo,
+      this.wrongWay,
       this.banner,
       this.countdown,
     );
@@ -151,6 +164,8 @@ export class Hud {
     this.explosiveLabel.textContent = this.i18n.t('hud.explosive');
     this.turboLabel.textContent = this.i18n.t('hud.turbo');
     this.comboLabel.textContent = this.i18n.t('hud.combo');
+    this.wrongWayTitle.textContent = this.i18n.t('hud.wrongWay');
+    this.wrongWayHint.textContent = this.i18n.t('hud.turnAround');
   }
 
   /** Best score of the stage, shown under the score (null hides it). */
@@ -261,6 +276,7 @@ export class Hud {
     this.turbo.classList.toggle('show', turbo > 0);
     this.turbo.classList.toggle('ending', turbo > 0 && turbo <= 1.5);
     if (turbo > 0) this.turboTime.textContent = turbo.toFixed(1);
+    this.wrongWay.classList.toggle('show', world.wrongWay);
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) this.banner.classList.remove('show');

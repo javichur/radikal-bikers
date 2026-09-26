@@ -455,7 +455,9 @@ export class GameRenderer {
     const target = new THREE.Vector3(p.x, p.y + b.height * 0.6, p.z);
 
     if (this.mode === 'chase') {
-      const heading = p.heading - b.yaw * 0.6;
+      // Leans follow the bike partly; once it turns round the camera swings behind it.
+      const lean = Math.abs(b.yaw) <= BIKE.maxYaw ? b.yaw * 0.6 : b.yaw - Math.sign(b.yaw) * BIKE.maxYaw * 0.4;
+      const heading = p.heading - lean;
       this.camHeading += wrapAngle(heading - this.camHeading) * damp(5, dt);
       const speedRatio = Math.max(0, b.speed) / (world.character.stats.topSpeed * BIKE.wheelieBoost);
       const dist = 6.2 + speedRatio * 1.6;

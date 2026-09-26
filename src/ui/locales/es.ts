@@ -45,6 +45,8 @@ export const es = {
   'hud.hurry': '¡DATE PRISA!',
   'hud.go': '¡YA!',
   'hud.crash': '¡PORRAZO!',
+  'hud.wrongWay': '¡SENTIDO CONTRARIO!',
+  'hud.turnAround': 'Da la vuelta',
   'hud.wheelie': '¡CABALLITO!',
   'hud.jump': '¡SALTO!',
   'hud.explosive': '¡EXPLOSIVOS!',

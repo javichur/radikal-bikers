@@ -1129,6 +1129,49 @@ body {
   background: var(--yellow);
 }
 
+.hud-wrongway {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.4rem 1.2rem;
+  border: 4px solid #fff;
+  border-radius: 0.8rem;
+  background: var(--red);
+  color: #fff;
+  font-style: italic;
+  text-align: center;
+  box-shadow: 0 0 0 4px var(--ink);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.6);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+  pointer-events: none;
+}
+
+.hud-wrongway.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  animation: hud-blink 0.8s steps(2) infinite;
+}
+
+.hud-wrongway-icon {
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  font-style: normal;
+}
+
+.hud-wrongway-title {
+  font-size: clamp(1.4rem, 4.5vw, 2.6rem);
+}
+
+.hud-wrongway-hint {
+  font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+  color: var(--yellow);
+}
+
 @keyframes hud-blink {
   50% {
     opacity: 0.3;
