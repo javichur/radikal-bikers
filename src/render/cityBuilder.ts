@@ -20,6 +20,7 @@ import { toon, withOutline } from './materials';
 import { monumentModel } from './monuments';
 import { coneGeometry, glowInstances, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import {
+  buildCatenary,
   buildCrossing,
   buildPark,
   buildSea,
@@ -480,6 +481,21 @@ export const buildCity = (world: World): CityScene => {
   for (const cp of world.rules.checkpoints) addGate(cp.s, cpTex);
   addGate(world.rules.finishS, bannerTexture('FINISH', true));
   addGate(8, bannerTexture('START', true));
+
+  // Overhead tram wires, with no poles in porticoes, side-street mouths or next to the gates.
+  if (look.catenary && (mix.tram ?? 0) > 0) {
+    const gates = [8, world.rules.finishS, ...world.rules.checkpoints.map((cp) => cp.s)].map((s) => ({
+      from: s - 2,
+      to: s + 2,
+    }));
+    buildCatenary(
+      track,
+      [...stage.lanes.forward, ...stage.lanes.oncoming],
+      hw,
+      [...tunnels, ...routes.flatMap((r) => r.mouths), ...gates],
+      root,
+    );
+  }
 
   // Ramps.
   const stripes = stripeTexture();
