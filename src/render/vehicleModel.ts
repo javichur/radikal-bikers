@@ -103,9 +103,9 @@ const cab = (g: THREE.Group, w: number, h: number, l: number, depth: number, col
 
 /**
  * Stylised traffic vehicle facing +Z, origin at ground centre. At `night` the lamps shine, headlight beams and a red
- * tail glow are drawn on the road and buses and trams show lit windows.
+ * tail glow are drawn on the road and buses and trams show lit windows. `busColor` is the city bus livery.
  */
-export const buildVehicle = (kind: VehicleKind, variant: number, night = false): THREE.Group => {
+export const buildVehicle = (kind: VehicleKind, variant: number, night = false, busColor = 0xff9f1c): THREE.Group => {
   const def = VEHICLES[kind];
   const { width: w, length: l, height: h } = def;
   const g = new THREE.Group();
@@ -151,7 +151,7 @@ export const buildVehicle = (kind: VehicleKind, variant: number, night = false):
       break;
     case 'bus': {
       const base = 0.4;
-      g.add(part(w, h * 0.85, l, 0xff9f1c, 0, base + h * 0.42, 0));
+      g.add(part(w, h * 0.85, l, busColor, 0, base + h * 0.42, 0));
       g.add(part(w + 0.02, h * 0.28, l * 0.92, cabin, 0, base + h * 0.58, 0));
       // Big front windscreen with destination sign, and a rear window.
       g.add(pane(w * 0.9, h * 0.42, base + h * 0.5, l / 2, 1, cabin));

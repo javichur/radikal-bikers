@@ -9,7 +9,7 @@ import { buildBike, buildTurboRockets, BIKE_WHEEL_RADIUS, type BikeRig, type Tur
 import type { SimEvent } from '../sim/events';
 import { TRAIN_LENGTH } from '../sim/crossing';
 import { buildCity, type CityScene } from './cityBuilder';
-import { poseObstacle } from './sceneryStyle';
+import { LOOKS, poseObstacle } from './sceneryStyle';
 import { Effects } from './effects';
 import { toon } from './materials';
 import { buildVehicle, flashBeacons } from './vehicleModel';
@@ -377,7 +377,7 @@ export class GameRenderer {
       alive.add(v.id);
       let g = this.vehicles.get(v.id);
       if (!g) {
-        g = buildVehicle(v.kind, v.variant, world.stage.theme.night);
+        g = buildVehicle(v.kind, v.variant, world.stage.theme.night, LOOKS[world.stage.scenery].bus);
         this.vehicles.set(v.id, g);
         this.scene.add(g);
       }

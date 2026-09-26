@@ -37,6 +37,8 @@ export interface SceneryLook {
   readonly guardrails: boolean;
   /** Stacks of shipping containers among the buildings, and tower cranes. */
   readonly containers: boolean;
+  /** Livery of the city buses. */
+  readonly bus: number;
 }
 
 const CITY: SceneryLook = {
@@ -57,6 +59,7 @@ const CITY: SceneryLook = {
   cobbles: false,
   guardrails: false,
   containers: false,
+  bus: 0xff9f1c,
 };
 
 export const LOOKS: Readonly<Record<SceneryStyle, SceneryLook>> = {
@@ -122,6 +125,8 @@ export const LOOKS: Readonly<Record<SceneryStyle, SceneryLook>> = {
     propChance: 0.65,
     treeChance: 0.6,
     tunnel: 'arcade',
+    // EMT València red.
+    bus: 0xd52b1e,
   },
 };
 

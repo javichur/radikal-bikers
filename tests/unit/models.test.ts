@@ -9,7 +9,7 @@ import { buildBike, solveTwoBone } from '../../src/render/bikeModel';
 import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
 import { monumentModel } from '../../src/render/monuments';
-import { obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
+import { LOOKS, obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
 import { buildVehicle, flashBeacons } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
 
@@ -99,6 +99,20 @@ describe('city builder', () => {
       expect(size.z).toBeGreaterThan(VEHICLES[kind].length * 0.9);
       expect(size.z).toBeLessThan(VEHICLES[kind].length * 1.1);
     }
+  });
+
+  it('paints the city buses in the livery of each scenery (red EMT buses in València)', () => {
+    const colors = (g: THREE.Object3D): number[] => {
+      const out: number[] = [];
+      g.traverse((o) => {
+        if (o instanceof THREE.Mesh && 'color' in o.material)
+          out.push((o.material as THREE.MeshToonMaterial).color.getHex());
+      });
+      return out;
+    };
+    expect(LOOKS.valencia.bus).toBe(0xd52b1e);
+    expect(colors(buildVehicle('bus', 1, false, LOOKS.valencia.bus))).toContain(0xd52b1e);
+    expect(colors(buildVehicle('bus', 1))).not.toContain(0xd52b1e);
   });
 
   it('lights up traffic vehicles only at night', () => {
