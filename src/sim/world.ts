@@ -17,7 +17,7 @@ import {
   type CrossingState,
 } from './crossing';
 import { addTrick, bankCombo, breakCombo, createCombo, stepCombo, TRICK_POINTS, type ComboState } from './combo';
-import type { SimEvent } from './events';
+import type { PickupKind, SimEvent } from './events';
 import { GhostRecorder } from './ghost';
 import {
   computeScore,
@@ -40,8 +40,9 @@ export interface Ramp {
   readonly width: number;
 }
 
-/** Explosive bonus box. */
+/** Bonus box (explosives or turbo). */
 export interface Pickup {
+  readonly kind: PickupKind;
   /** -1 = main road, otherwise shortcut index. */
   readonly route: number;
   readonly s: number;
@@ -75,6 +76,8 @@ export const PICKUP_RADIUS = 1.6;
 export const PICKUP_RESPAWN = 25;
 /** Base points for every vehicle blown up (before the combo multiplier). */
 export const EXPLODE_POINTS = TRICK_POINTS.explode;
+/** Base points for collecting a turbo box (before the combo multiplier). */
+export const TURBO_POINTS = TRICK_POINTS.turbo;
 /** Bonus for delivering before the rival. */
 export const RIVAL_POINTS = 5000;
 /** Lateral clearance (m) under which passing a vehicle counts as a near miss. */
@@ -150,6 +153,7 @@ export class World {
     this.ramps = stage.ramps.map((r) => ({ s: r.at * this.track.length, d: r.d, width: r.width }));
     this.routes = stage.shortcuts.map((def, i) => buildRoute(this.track, stage.roadHalfWidth, def, i));
     this.pickups = stage.pickups.map((p) => ({
+      kind: p.kind ?? 'explosive',
       route: p.route,
       s: p.at * this.trackOf(p.route).length,
       d: p.d,
@@ -321,6 +325,9 @@ export class World {
           this.stats.explosions++;
           addTrick(c, 'explode', events);
           break;
+        case 'pickup':
+          if (e.kind === 'turbo') addTrick(c, 'turbo', events);
+          break;
         case 'jump':
           this.airtime = 0;
           break;
@@ -368,7 +375,7 @@ export class World {
       if (Math.abs(b.d - c.d) > BIKE.width / 2 + CONE_RADIUS) continue;
       c.hit = true;
       this.stats.cones++;
-      if (b.explosive <= 0) b.speed *= CONE_SPEED_KEEP;
+      if (b.explosive <= 0 && b.turbo <= 0) b.speed *= CONE_SPEED_KEEP;
       events.push({ type: 'cone', index: i });
     }
   }
@@ -490,8 +497,9 @@ export class World {
       if (p.route !== b.route || b.crashTimer > 0 || b.height > 1.5) continue;
       if (Math.hypot(b.s - p.s, b.d - p.d) > PICKUP_RADIUS) continue;
       p.respawn = PICKUP_RESPAWN;
-      b.explosive = BIKE.explosiveDuration;
-      events.push({ type: 'pickup', kind: 'explosive' });
+      if (p.kind === 'turbo') b.turbo = BIKE.turboDuration;
+      else b.explosive = BIKE.explosiveDuration;
+      events.push({ type: 'pickup', kind: p.kind });
     }
   }
 
@@ -565,6 +573,13 @@ export class World {
         vehicles.splice(i, 1);
         b.speed *= 0.9;
         events.push({ type: 'explode', vehicleId: v.id, s: v.s, d: v.d });
+        continue;
+      }
+      if (b.turbo > 0) {
+        // Turbo: the rockets lift the bike over every vehicle in its way.
+        const closing = Math.abs(b.speed * Math.cos(b.yaw) - v.speed * v.dir);
+        hopBike(b, v.id, v.height, v.length + BIKE.length, closing, events);
+        hopping = true;
         continue;
       }
       if (b.explosive > 0 && VEHICLES[v.kind].indestructible) {

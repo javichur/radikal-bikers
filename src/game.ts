@@ -497,7 +497,7 @@ export class Game {
         break;
       }
       case 'pickup':
-        this.hud.flash(t('hud.explosive'), 1.4, 'bonus');
+        this.hud.flash(t(e.kind === 'turbo' ? 'hud.turbo' : 'hud.explosive'), 1.4, 'bonus');
         break;
       case 'explode':
         this.hud.flash(t('hud.boom', { p: EXPLODE_POINTS }), 1.2, 'bonus');

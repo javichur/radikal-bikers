@@ -34,6 +34,7 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 | Cristal roto                               | 300         |
 | Atajo completado                           | 500         |
 | Vehículo explotado (bonus explosivo)       | 1000        |
+| Caja de turbo recogida                     | 1500        |
 
 «A un pelo» y el salto aplican un breve efecto de cámara lenta.
 
@@ -75,13 +76,16 @@ calles reales de València.
 | Paseo Marítimo         | ★          | ~2,6 km  | 4 carriles                | 45 s / +22, +20, +18 s       | Avenida junto al mar, pocas curvas, 7 rampas, callejones hacia el paseo, palmeras y sombrillas              |
 | Puerto Radikal         | ★★         | ~3,1 km  | 4 carriles                | 40 s / +30, +28, +25 s       | Curvas enlazadas, puente sobre el río, túnel, atajos por tiendas y callejones                               |
 | Centro Histórico       | ★★★        | ~2,3 km  | 2 carriles, adoquines     | 40 s / +26, +24, +20 s       | Esquinas de 90°, soportales, fuente en la plaza, conos y vallas de obra, tranvía, 4 tiendas                 |
-| Zona Industrial        | ★★★★       | ~2,7 km  | 4 carriles                | 40 s / +26, +24, +20 s       | Paso a nivel con tren, tráfico pesado (camiones, autobuses), naves, contenedores y grúas, túnel             |
+| Zona Industrial        | ★★★★       | ~2,7 km  | 4 carriles                | 40 s / +26, +24, +20 s       | Paso a nivel con tren, tráfico pesado (camiones, cisternas, autobuses), naves, contenedores y grúas, túnel  |
 | Carretera de la Colina | ★★★★★      | ~4,2 km  | 2 carriles, guardarraíles | 45 s / +34, +32, +28, +24 s  | Crestas que hacen saltar sin rampa, puente sobre el barranco, túnel largo, atajos de tierra, tráfico rápido |
 
 Obstáculos y peligros nuevos:
 
 - **Tranvía** (Centro Histórico): vehículo largo por raíles centrales, indestructible (ni los explosivos lo mueven);
   se puede saltar desde una rampa.
+- **Tráfico variado**: además de coches, taxis, furgonetas, autobuses y camiones circulan coches de policía,
+  ambulancias y camiones de bomberos (con rotativos que parpadean), camiones de la basura lentos (Centro Histórico y
+  Zona Industrial) y camiones cisterna (Zona Industrial y Carretera de la Colina).
 - **Obstáculos fijos**: los conos se derriban al pasar (frenan un poco); las vallas de obra y la fuente provocan caída.
   Los explosivos rompen las vallas, pero no la fuente.
 - **Paso a nivel** (Zona Industrial): el tren pasa según un horario determinista; la campana y las luces avisan
@@ -97,7 +101,10 @@ Cada partida elige al azar 2 **obras** (conos que cierran un carril; el tráfico
 atropellar un cono frena la moto) y usa una semilla de tráfico distinta (fija con `?e2e`).
 
 **Puerto Radikal de noche**: mismas calles con iluminación nocturna y faro, más tráfico, 3 obras, rival Nitro y retos
-más duros.
+más duros. De noche también se iluminan los demás vehículos (faros con haz en el asfalto, pilotos traseros y ventanillas
+de autobuses y tranvías), las farolas (cono y charco de luz), los túneles (luz bajo cada plafón), los escaparates y
+rótulos de las tiendas y las ventanas de los edificios. Son luces falsas (formas aditivas con degradado por vértice), sin
+coste de luces reales.
 
 **València** (★★★★★, ~3,9 km, 4 carriles, 45 s / +42, +32, +32, +38 s; se desbloquea con 8 ⭐): reparto en plenas
 Fallas sobre un trazado sacado de coordenadas reales (lat/lon proyectadas a metros con una escala uniforme de 0,53, así

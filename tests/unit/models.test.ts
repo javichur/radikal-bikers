@@ -10,7 +10,7 @@ import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
 import { monumentModel } from '../../src/render/monuments';
 import { obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
-import { buildVehicle } from '../../src/render/vehicleModel';
+import { buildVehicle, flashBeacons } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
 
 beforeAll(() => {
@@ -98,6 +98,45 @@ describe('city builder', () => {
       const size = box.getSize(new THREE.Vector3());
       expect(size.z).toBeGreaterThan(VEHICLES[kind].length * 0.9);
       expect(size.z).toBeLessThan(VEHICLES[kind].length * 1.1);
+    }
+  });
+
+  it('lights up traffic vehicles only at night', () => {
+    const glows = (g: THREE.Object3D): number => g.children.filter((c) => c.name === 'nightGlow').length;
+    for (const kind of VEHICLE_KINDS) {
+      expect(glows(buildVehicle(kind, 1))).toBe(0);
+      expect(glows(buildVehicle(kind, 1, true))).toBe(2);
+    }
+  });
+
+  it('adds street lamp, tunnel and shop window light only to night stages', () => {
+    const additive = (root: THREE.Object3D): number => {
+      let n = 0;
+      root.traverse((o) => {
+        if (o instanceof THREE.Mesh && (o.material as THREE.Material).blending === THREE.AdditiveBlending) n++;
+      });
+      return n;
+    };
+    for (const stage of STAGES) {
+      const n = additive(buildCity(new World(stage, CHARACTERS[0]!)).root);
+      if (stage.theme.night) expect(n).toBeGreaterThan(3);
+      else expect(n).toBe(0);
+    }
+  });
+
+  it('gives emergency and service vehicles flashing beacons', () => {
+    for (const kind of VEHICLE_KINDS) {
+      const g = buildVehicle(kind, 0);
+      const bars = g.userData.beacons as THREE.Object3D[][] | undefined;
+      const expected = kind === 'police' || kind === 'ambulance' || kind === 'fireTruck' || kind === 'garbageTruck';
+      expect(bars !== undefined).toBe(expected);
+      if (!bars) continue;
+      flashBeacons(g, 0, 0);
+      const [a, b] = bars[0]!;
+      expect(a!.visible).not.toBe(b!.visible);
+      const before = a!.visible;
+      flashBeacons(g, 1 / 6, 0);
+      expect(a!.visible).toBe(!before);
     }
   });
 });

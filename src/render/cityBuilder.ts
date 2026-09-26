@@ -4,6 +4,7 @@ import { MONUMENTS } from '../content/monuments';
 import { DEFAULT_TRAFFIC_MIX } from '../content/vehicles';
 import { inPolygon, inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
 import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
+import type { PickupKind } from '../sim/events';
 import type { World } from '../sim/world';
 import {
   bridgeSpan,
@@ -17,6 +18,7 @@ import {
 } from './landmarks';
 import { toon, withOutline } from './materials';
 import { monumentModel } from './monuments';
+import { coneGeometry, glowInstances, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import {
   buildCrossing,
   buildPark,
@@ -27,7 +29,15 @@ import {
   umbrellaModel,
   type CrossingScene,
 } from './sceneryStyle';
-import { bannerTexture, roadTexture, shedTexture, stripeTexture, tntTexture, windowTexture } from './textures';
+import {
+  bannerTexture,
+  roadTexture,
+  shedTexture,
+  stripeTexture,
+  tntTexture,
+  turboTexture,
+  windowTextures,
+} from './textures';
 import { inRanges, ribbon, segments, sweep, wall } from './trackGeometry';
 
 const ROAD_TEX_LENGTH = 16;
@@ -36,7 +46,7 @@ export interface CityScene {
   readonly root: THREE.Group;
   /** Shop window meshes, per shortcut, in the same order as `route.panes`. */
   readonly panes: readonly (readonly THREE.Object3D[])[];
-  /** Explosive boxes, in the same order as `world.pickups`. */
+  /** Bonus boxes, in the same order as `world.pickups`. */
   readonly pickups: readonly THREE.Object3D[];
   /** Road obstacles, in the same order as `world.obstacles`. */
   readonly obstacles: readonly THREE.Object3D[];
@@ -78,19 +88,31 @@ const rampGeometry = (width: number, length: number, height: number): THREE.Buff
   return geo;
 };
 
-const pickupModel = (tex: THREE.Texture): THREE.Group => {
+const pickupModel = (tex: THREE.Texture, kind: PickupKind): THREE.Group => {
   const g = new THREE.Group();
   const crate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), toon(0xffffff, { map: tex }));
   crate.castShadow = true;
   const inner = withOutline(crate, 0.08);
   inner.name = 'crate';
-  const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 6), toon(0x222222));
-  fuse.position.y = 0.75;
-  const spark = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff8800 }));
-  spark.position.y = 0.98;
-  spark.name = 'spark';
-  inner.add(fuse, spark);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 24), toon(0xffd166, { emissive: 0xb35900 }));
+  if (kind === 'turbo') {
+    // A little rocket on top, with its flame pulsing.
+    const rocket = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 10), toon(0xe63946));
+    rocket.position.y = 0.8;
+    const flame = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff5500 }));
+    flame.position.y = 0.55;
+    flame.name = 'spark';
+    inner.add(rocket, flame);
+  } else {
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 6), toon(0x222222));
+    fuse.position.y = 0.75;
+    const spark = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff8800 }));
+    spark.position.y = 0.98;
+    spark.name = 'spark';
+    inner.add(fuse, spark);
+  }
+  const ringColor = kind === 'turbo' ? 0x4cc9f0 : 0xffd166;
+  const ringGlow = kind === 'turbo' ? 0x0077b6 : 0xb35900;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 24), toon(ringColor, { emissive: ringGlow }));
   ring.rotation.x = Math.PI / 2;
   ring.position.y = -0.75;
   g.add(inner, ring);
@@ -107,6 +129,7 @@ export const buildCity = (world: World): CityScene => {
   const rng = new Rng(stage.seed);
   const look = LOOKS[stage.scenery];
   const mix = stage.trafficMix ?? DEFAULT_TRAFFIC_MIX;
+  const night = stage.theme.night ?? false;
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), toon(stage.theme.ground));
   ground.rotation.x = -Math.PI / 2;
@@ -204,9 +227,13 @@ export const buildCity = (world: World): CityScene => {
   const bGeo = new THREE.BoxGeometry(1, 1, 1);
   bGeo.translate(0, 0.5, 0);
   const maxBuildings = Math.ceil(L / 8) * 2 + 400;
+  const facade = look.sheds ? { map: shedTexture(), glow: null } : windowTextures();
   const buildings = new THREE.InstancedMesh(
     bGeo,
-    toon(0xffffff, { map: look.sheds ? shedTexture() : windowTexture() }),
+    toon(
+      0xffffff,
+      night && facade.glow ? { map: facade.map, emissive: 0xffffff, emissiveMap: facade.glow } : { map: facade.map },
+    ),
     maxBuildings,
   );
   buildings.castShadow = true;
@@ -270,6 +297,8 @@ export const buildCity = (world: World): CityScene => {
   let count = 0;
   const propsTrees: THREE.Matrix4[] = [];
   const propsLamps: THREE.Matrix4[] = [];
+  /** Light pools on the road next to each street lamp (night only). */
+  const lampPools: THREE.Matrix4[] = [];
   const placeRow = (row: BuildingRow): void => {
     const t = world.trackOf(row.route);
     const side = Math.sign(row.offset);
@@ -315,6 +344,8 @@ export const buildCity = (world: World): CityScene => {
       const mat = new THREE.Matrix4().makeTranslation(pp.x, pp.y + 0.2, pp.z);
       const tree = !onBridge && rng.next() < look.treeChance;
       if (tree || !look.guardrails) (tree ? propsTrees : propsLamps).push(mat);
+      if (night && !tree && !look.guardrails)
+        lampPools.push(poolMatrix(track.toWorld(s, side * (hw - 0.5)), track.sample(s).slope));
     }
   }
   rows.forEach((r) => placeRow({ ...r, minHeight: look.routeHeight[0], maxHeight: look.routeHeight[1] }));
@@ -340,12 +371,22 @@ export const buildCity = (world: World): CityScene => {
   const bulbGeo = new THREE.SphereGeometry(0.3, 8, 6);
   bulbGeo.translate(0, 5.1, 0);
   const poles = new THREE.InstancedMesh(poleGeo, toon(0x495057), propsLamps.length);
-  const bulbs = new THREE.InstancedMesh(bulbGeo, toon(0xfff3b0, { emissive: 0x80704a }), propsLamps.length);
+  const bulbs = new THREE.InstancedMesh(
+    bulbGeo,
+    toon(0xfff3b0, { emissive: night ? 0xfff3b0 : 0x80704a }),
+    propsLamps.length,
+  );
   propsLamps.forEach((mt, i) => {
     poles.setMatrixAt(i, mt);
     bulbs.setMatrixAt(i, mt);
   });
   root.add(trunks, crowns, poles, bulbs);
+  if (night) {
+    root.add(
+      glowInstances(coneGeometry(0.3, 3.2, 5, 0.22), LAMP_LIGHT, propsLamps),
+      glowInstances(poolGeometry(5, 0.5), LAMP_LIGHT, lampPools),
+    );
+  }
 
   // Beach umbrellas on the sand between the road and the sea.
   if (sea) {
@@ -452,10 +493,11 @@ export const buildCity = (world: World): CityScene => {
     root.add(ramp);
   }
 
-  // Explosive bonus boxes.
+  // Bonus boxes (explosives and turbo).
   const tnt = tntTexture();
+  const turbo = turboTexture();
   const pickups = world.pickups.map((pk) => {
-    const g = pickupModel(tnt);
+    const g = pickupModel(pk.kind === 'turbo' ? turbo : tnt, pk.kind);
     const p = world.trackOf(pk.route).toWorld(pk.s, pk.d);
     g.position.set(p.x, p.y + 0.95, p.z);
     root.add(g);

@@ -12,6 +12,7 @@ import {
 } from '../sim/shortcuts';
 import type { World } from '../sim/world';
 import { toon } from './materials';
+import { glowInstances, glowMaterial, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import { arcadeProfiles } from './sceneryStyle';
 import {
   alleyTexture,
@@ -24,7 +25,7 @@ import {
   stripeTexture,
   tileTexture,
   waterTexture,
-  windowTexture,
+  windowTextures,
 } from './textures';
 import { rangesWhere, ribbon, segments, sweep, wall } from './trackGeometry';
 
@@ -66,15 +67,27 @@ const VALENCIA_SHOPS = [
 ];
 
 let glass: THREE.MeshPhongMaterial | null = null;
-const glassMaterial = (): THREE.MeshPhongMaterial =>
-  (glass ??= new THREE.MeshPhongMaterial({
-    color: 0xbfe9ff,
-    specular: 0xffffff,
-    shininess: 120,
-    transparent: true,
-    opacity: 0.38,
-    depthWrite: false,
-  }));
+let litGlass: THREE.MeshPhongMaterial | null = null;
+/** Shop window glass; at night it glows with the light of the shop behind it. */
+const glassMaterial = (night: boolean): THREE.MeshPhongMaterial =>
+  night
+    ? (litGlass ??= new THREE.MeshPhongMaterial({
+        color: 0xffe8a3,
+        emissive: 0x8a6f2a,
+        specular: 0xffffff,
+        shininess: 120,
+        transparent: true,
+        opacity: 0.45,
+        depthWrite: false,
+      }))
+    : (glass ??= new THREE.MeshPhongMaterial({
+        color: 0xbfe9ff,
+        specular: 0xffffff,
+        shininess: 120,
+        transparent: true,
+        opacity: 0.38,
+        depthWrite: false,
+      }));
 
 /** Store with shop windows on the street side and at the back, which the shortcut runs straight through. */
 const buildShop = (
@@ -89,6 +102,7 @@ const buildShop = (
   const main = world.track;
   const t = route.track;
   const hw = world.stage.roadHalfWidth;
+  const night = world.stage.theme.night ?? false;
   const e = hw + SIDEWALK + FACADE_GAP;
   const D = SHOP_DEPTH;
   const H = 6.5;
@@ -157,13 +171,26 @@ const buildShop = (
     box(0.45, H - 3.8, w, wallMat, mid, lat, 3.8 + (H - 3.8) / 2);
     box(0.5, 0.18, w, trim, mid, lat, 3.75);
     for (const k of [-1, 1]) box(0.5, 3.8, 0.2, trim, mid + (k * w) / 2, lat, 1.9);
-    const pane = box(0.1, 3.6, w, glassMaterial(), mid, lat, 1.85);
+    const pane = box(0.1, 3.6, w, glassMaterial(night), mid, lat, 1.85);
     pane.castShadow = false;
     pane.renderOrder = 2;
     const idx = route.panes.findIndex((p) => p.s === o.paneS);
     if (idx >= 0) panes[idx] = pane;
+    if (night) {
+      // Light from the shop window spilling onto the lane outside.
+      const spill = new THREE.Mesh(poolGeometry(w / 2 + 1.5, 0.5), glowMaterial(LAMP_LIGHT));
+      spill.position.copy(at(mid, lat === e ? lat - 2 : lat + 2, 0.06));
+      spill.scale.x = 0.6;
+      spill.rotation.y = c.heading;
+      spill.renderOrder = 1;
+      g.add(spill);
+    }
     if (lat === e) {
-      const sign = toon(0xffffff, { map: signTexture(style.name, style.sign) });
+      const signTex = signTexture(style.name, style.sign);
+      const sign = toon(
+        0xffffff,
+        night ? { map: signTex, emissive: 0xcccccc, emissiveMap: signTex } : { map: signTex },
+      );
       box(0.25, 1.3, w + 2, [sign, sign, trim, trim, trim, trim], mid, lat - 0.3, 4.9);
       const awn = box(1.8, 0.08, w + 1.5, toon(0xffffff, { map: awningTexture(style.awning) }), mid, lat - 1, 3.95);
       awn.rotation.z = -route.side * 0.35;
@@ -187,6 +214,14 @@ const buildShop = (
       else box(1.0, 2.1, 2.6, shelf, u, lat, 1.05);
     }
     box(0.5, 0.08, 1.6, lamp, u, e + D / 2, H - 0.12).castShadow = false;
+  }
+  if (night) {
+    const floor = new THREE.Mesh(poolGeometry(1, 0.35), glowMaterial(LAMP_LIGHT));
+    floor.position.copy(at(um, e + D / 2, 0.08));
+    floor.scale.set(D / 2, 1, (umax - umin) / 2);
+    floor.rotation.y = c.heading;
+    floor.renderOrder = 1;
+    g.add(floor);
   }
   obstacles.push({ ...at(um, e + D / 2, 0), r: Math.max(umax - umin, D) / 2 + 1 });
 };
@@ -291,6 +326,7 @@ export const buildTunnel = (
   const t = world.track;
   const W = world.stage.roadHalfWidth + SIDEWALK + 0.6;
   const arcade = style === 'arcade';
+  const night = world.stage.theme.night ?? false;
   let inner: [number, number][] = [[-W, -0.2]];
   inner.push([-W, 4.2]);
   for (let k = 1; k < 8; k++) {
@@ -316,9 +352,16 @@ export const buildTunnel = (
   );
   shell.castShadow = true;
   shell.receiveShadow = true;
+  const windows = arcade ? windowTextures() : null;
   const hill = new THREE.Mesh(
     sweep(t, outer, range.from, range.to, 3, 20),
-    arcade ? toon(0xe9b872, { map: windowTexture(), side: THREE.DoubleSide }) : toon(0x6aa84f),
+    windows
+      ? toon(0xe9b872, {
+          map: windows.map,
+          side: THREE.DoubleSide,
+          ...(night ? { emissive: 0xffffff, emissiveMap: windows.glow } : {}),
+        })
+      : toon(0x6aa84f),
   );
   hill.castShadow = true;
   hill.receiveShadow = true;
@@ -353,14 +396,19 @@ export const buildTunnel = (
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
+  const pools: THREE.Matrix4[] = [];
   for (let i = 0; i < count; i++) {
-    const p = t.toWorld(range.from + 5 + i * 10, 0);
+    const s = range.from + 5 + i * 10;
+    const p = t.toWorld(s, 0);
     q.setFromAxisAngle(up, p.heading);
     m.compose(new THREE.Vector3(p.x, p.y + (arcade ? 7.5 : 7.9), p.z), q, new THREE.Vector3(1, 1, 1));
     lights.setMatrixAt(i, m);
+    if (night) pools.push(poolMatrix(p, t.sample(s).slope));
   }
   lights.count = count;
   root.add(lights);
+  // At night the ceiling lights leave pools of light on the road.
+  if (night) root.add(glowInstances(poolGeometry(W * 0.75, 0.45), LAMP_LIGHT, pools));
   const strip = toon(0xffb347, { emissive: 0xb86b00, side: THREE.DoubleSide });
   for (const k of [-1, 1]) root.add(new THREE.Mesh(wall(t, k * (W - 0.05), 3, 3.25, range.from, range.to), strip));
 

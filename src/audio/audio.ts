@@ -220,7 +220,11 @@ export class AudioEngine {
         [880, 880, 880].forEach((f, i) => this.tone(f, 0.1, 'square', 0.12, i * 0.18));
         break;
       case 'pickup':
-        [392, 523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.1, 'square', 0.12, i * 0.05));
+        if (e.kind === 'turbo') {
+          // Rocket ignition: a rising whoosh over a roar.
+          this.burst(0.8, 0.35);
+          [220, 330, 440, 660, 880, 1320].forEach((f, i) => this.tone(f, 0.12, 'sawtooth', 0.1, i * 0.04));
+        } else [392, 523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.1, 'square', 0.12, i * 0.05));
         break;
       case 'explode':
         this.burst(1.1, 0.7);

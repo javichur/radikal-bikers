@@ -57,6 +57,7 @@ src/
 | Muros        | Roce con pérdida de velocidad (menor cuanto más peso); impacto lateral > 9 m/s = rebote y −25 % de velocidad |
 | Tráfico      | Choque frontal/alcance con velocidad relativa > 4 m/s = caída; con caballito la moto puede trepar y saltar   |
 | Explosivo    | Con el bonus activo, los vehículos golpeados explotan y el piloto no se cae                                  |
+| Turbo        | 5 s con dos cohetes en los laterales: la moto va a 150 km/h y salta por encima de todos los vehículos        |
 | Escaparates  | Romper los cristales resta un 15 % de velocidad, sin caída                                                   |
 | Obstáculos   | Conos: se derriban y frenan; vallas, fuente y barreras bajadas: caída (se pueden saltar)                     |
 | Paso a nivel | Horario determinista (`sim/crossing.ts`); campana, barreras y tren que atropella; el tráfico espera          |
