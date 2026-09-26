@@ -1,5 +1,5 @@
 export type SimEvent =
-  | { readonly type: 'crash'; readonly cause: 'wall' | 'vehicle' | 'landing' }
+  | { readonly type: 'crash'; readonly cause: 'wall' | 'vehicle' | 'landing' | 'obstacle' }
   | { readonly type: 'respawn' }
   | { readonly type: 'scrape' }
   | { readonly type: 'jump' }
@@ -13,4 +13,6 @@ export type SimEvent =
   | { readonly type: 'pickup'; readonly kind: 'explosive' }
   | { readonly type: 'explode'; readonly vehicleId: number; readonly s: number; readonly d: number }
   | { readonly type: 'glass'; readonly route: number; readonly pane: number }
-  | { readonly type: 'shortcut'; readonly route: number };
+  | { readonly type: 'shortcut'; readonly route: number }
+  | { readonly type: 'knock'; readonly index: number }
+  | { readonly type: 'crossingBell'; readonly index: number };

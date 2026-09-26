@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../../src/content/characters';
-import { STAGES } from '../../src/content/stages';
+import { getStage, STAGES } from '../../src/content/stages';
 import { BIKE } from '../../src/sim/bike';
 import { World } from '../../src/sim/world';
 import { autopilot, controls, run } from './helpers';
 
-const stage = STAGES[0]!;
+const stage = getStage('harbor');
 const newWorld = (c = 0): World => new World(stage, CHARACTERS[c]!);
 
 describe('World', () => {
@@ -107,16 +107,17 @@ describe('World', () => {
     expect(w.bike.invulnerable).toBeGreaterThan(0);
   });
 
-  it.each(CHARACTERS.map((c, i) => [c.id, i] as const))(
-    'the course can be completed by %s with a clean run, but not with a large margin',
-    (_id, i) => {
-      const w = newWorld(i);
-      let lane = 3;
-      run(w, 180, (world) => {
+  it.each(STAGES.flatMap((st) => CHARACTERS.map((c, i) => [st.id, c.id, i] as const)))(
+    '%s can be completed by %s with a clean run, but not with a large margin',
+    (stageId, _id, i) => {
+      const st = getStage(stageId);
+      const w = new World(st, CHARACTERS[i]!);
+      const inner = st.lanes.forward[0]!;
+      const outer = st.lanes.forward[st.lanes.forward.length - 1]!;
+      run(w, 240, (world) => {
         if (world.race.finished || world.race.timeUp) return controls();
         // Change lane occasionally to use the whole road like a player would.
-        lane = world.bike.s % 600 < 300 ? 3 : 9;
-        return autopilot(world, lane);
+        return autopilot(world, world.bike.s % 600 < 300 ? inner : outer);
       });
       expect(w.race.timeUp).toBe(false);
       expect(w.race.finished).toBe(true);

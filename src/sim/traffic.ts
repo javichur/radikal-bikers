@@ -1,6 +1,6 @@
 import { approach } from '../core/math';
 import type { Rng } from '../core/rng';
-import { VEHICLE_KINDS, VEHICLES, type VehicleKind } from '../content/vehicles';
+import { DEFAULT_TRAFFIC_MIX, VEHICLE_KINDS, VEHICLES, type TrafficMix, type VehicleKind } from '../content/vehicles';
 import type { SimEvent } from './events';
 
 export interface Vehicle {
@@ -30,7 +30,14 @@ export interface TrafficConfig {
   readonly ahead?: number;
   /** No traffic is spawned before this distance (start grid). */
   readonly startClearance?: number;
+  /** Relative spawn probability per vehicle kind (defaults to `DEFAULT_TRAFFIC_MIX`). */
+  readonly mix?: TrafficMix;
+  /** Cruise speed multiplier for oncoming traffic (fast country roads). */
+  readonly oncomingSpeedScale?: number;
 }
+
+/** Distance kept by traffic before a closed level crossing (clear of the jump ramp in front of it). */
+export const CROSSING_STOP_GAP = 14;
 
 const MIN_SPAWN_GAP = 22;
 const HONK_DISTANCE = 16;
@@ -41,6 +48,7 @@ export class Traffic {
   private readonly behind: number;
   private readonly ahead: number;
   private readonly startClearance: number;
+  private readonly mix: TrafficMix;
   private readonly weightTotal: number;
 
   constructor(
@@ -50,7 +58,8 @@ export class Traffic {
     this.behind = cfg.behind ?? 90;
     this.ahead = cfg.ahead ?? 340;
     this.startClearance = cfg.startClearance ?? 70;
-    this.weightTotal = VEHICLE_KINDS.reduce((a, k) => a + VEHICLES[k].weight, 0);
+    this.mix = cfg.mix ?? DEFAULT_TRAFFIC_MIX;
+    this.weightTotal = VEHICLE_KINDS.reduce((a, k) => a + (this.mix[k] ?? 0), 0);
   }
 
   /** Fills the window around the player at race start. */
@@ -64,11 +73,15 @@ export class Traffic {
 
   private pickKind(): VehicleKind {
     let r = this.rng.next() * this.weightTotal;
+    let last: VehicleKind = 'car';
     for (const k of VEHICLE_KINDS) {
-      r -= VEHICLES[k].weight;
+      const w = this.mix[k] ?? 0;
+      if (w <= 0) continue;
+      last = k;
+      r -= w;
       if (r <= 0) return k;
     }
-    return 'car';
+    return last;
   }
 
   private trySpawn(s: number): Vehicle | null {
@@ -80,7 +93,10 @@ export class Traffic {
     const blocked = this.vehicles.some((v) => v.d === d && Math.abs(v.s - s) < MIN_SPAWN_GAP);
     if (blocked) return null;
     const def = VEHICLES[this.pickKind()];
-    const cruise = this.rng.range(def.minSpeed, def.maxSpeed);
+    // Long vehicles (trams) need more room than the fixed spawn gap.
+    const clear = (v: Vehicle): boolean => v.d !== d || Math.abs(v.s - s) >= (v.length + def.length) / 2 + 4;
+    if (!this.vehicles.every(clear)) return null;
+    const cruise = this.rng.range(def.minSpeed, def.maxSpeed) * (oncoming ? (this.cfg.oncomingSpeedScale ?? 1) : 1);
     const v: Vehicle = {
       id: this.nextId++,
       kind: def.kind,
@@ -114,14 +130,26 @@ export class Traffic {
     return best ? { vehicle: best, gap: bestGap } : null;
   }
 
-  update(playerS: number, playerD: number, playerSpeed: number, dt: number, events: SimEvent[]): void {
+  /**
+   * @param closedCrossings main-road distances of level crossings whose barriers are down: traffic stops before them.
+   */
+  update(
+    playerS: number,
+    playerD: number,
+    playerSpeed: number,
+    dt: number,
+    events: SimEvent[],
+    closedCrossings: readonly number[] = [],
+  ): void {
     for (const v of this.vehicles) {
       v.honkCooldown = Math.max(0, v.honkCooldown - dt);
       let target = v.cruiseSpeed;
+      const safe = 8 + v.speed * 0.9;
       const leader = this.leaderOf(v);
-      if (leader) {
-        const safe = 8 + v.speed * 0.9;
-        if (leader.gap < safe) target = Math.min(target, leader.vehicle.speed * (leader.gap / safe));
+      if (leader && leader.gap < safe) target = Math.min(target, leader.vehicle.speed * (leader.gap / safe));
+      for (const c of closedCrossings) {
+        const gap = (c - v.dir * CROSSING_STOP_GAP - v.s) * v.dir - v.length / 2;
+        if (gap > -0.5 && gap < safe) target = Math.min(target, v.cruiseSpeed * Math.max(0, gap / safe - 0.1));
       }
       // React to the player blocking the lane.
       const toPlayer = (playerS - v.s) * v.dir - v.length / 2;

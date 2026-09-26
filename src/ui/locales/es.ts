@@ -22,6 +22,19 @@ export const es = {
   'stage.harbor.name': 'Puerto Radikal',
   'stage.harbor.desc':
     'Del puerto al barrio alto: cuestas, puente, túnel, atajos por callejones y tiendas, y cajas de explosivos. ¡Cuidado con los autobuses!',
+  'stage.beach.name': 'Paseo Marítimo',
+  'stage.beach.desc':
+    'La avenida junto al mar: recta, ancha y llena de rampas. Atajo por una tienda y callejones hacia el paseo. Ideal para empezar.',
+  'stage.oldtown.name': 'Centro Histórico',
+  'stage.oldtown.desc':
+    'Calles adoquinadas de un carril por sentido, soportales, una fuente en la plaza y obras. ¡Cuidado con el tranvía, no se aparta!',
+  'stage.industrial.name': 'Zona Industrial',
+  'stage.industrial.desc':
+    'Naves, contenedores y camiones. Un paso a nivel corta la calle: salta las barreras con la rampa o espera al tren.',
+  'stage.hills.name': 'Carretera de la Colina',
+  'stage.hills.desc':
+    'La ruta más larga: crestas que te hacen volar, un puente sobre el río, un túnel largo y atajos de tierra. El tráfico baja deprisa.',
+  'stage.difficulty': 'Dificultad',
   'stage.length': 'Longitud',
   'stage.checkpoints': 'Controles',
   'hud.time': 'TIEMPO',
@@ -38,6 +51,7 @@ export const es = {
   'hud.boom': '¡BUUUM! +{p}',
   'hud.glass': '¡CRASH! ¡ESCAPARATE!',
   'hud.shortcut': '¡ATAJO!',
+  'hud.train': '¡TREN!',
   'pause.title': 'Pausa',
   'pause.resume': 'Continuar',
   'pause.restart': 'Reiniciar',

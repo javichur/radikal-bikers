@@ -24,6 +24,19 @@ export const en: Record<MessageKey, string> = {
   'stage.harbor.name': 'Radikal Harbor',
   'stage.harbor.desc':
     'From the docks to uptown: hills, a bridge, a tunnel, alley and shop shortcuts, and explosive crates. Watch out for buses!',
+  'stage.beach.name': 'Seafront Promenade',
+  'stage.beach.desc':
+    'The avenue by the sea: straight, wide and full of ramps. A shop shortcut and alleys down to the promenade. Perfect to start with.',
+  'stage.oldtown.name': 'Old Town',
+  'stage.oldtown.desc':
+    'Cobbled streets with one lane each way, porticoes, a fountain on the square and roadworks. Watch out for the tram: it will not move!',
+  'stage.industrial.name': 'Industrial Zone',
+  'stage.industrial.desc':
+    'Warehouses, containers and lorries. A level crossing cuts the street: jump the barriers off the ramp or wait for the train.',
+  'stage.hills.name': 'Hill Road',
+  'stage.hills.desc':
+    'The longest route: crests that send you flying, a bridge over the river, a long tunnel and dirt shortcuts. Traffic comes down fast.',
+  'stage.difficulty': 'Difficulty',
   'stage.length': 'Length',
   'stage.checkpoints': 'Checkpoints',
   'hud.time': 'TIME',
@@ -40,6 +53,7 @@ export const en: Record<MessageKey, string> = {
   'hud.boom': 'KABOOM! +{p}',
   'hud.glass': 'SMASH! SHOP WINDOW!',
   'hud.shortcut': 'SHORTCUT!',
+  'hud.train': 'TRAIN!',
   'pause.title': 'Paused',
   'pause.resume': 'Resume',
   'pause.restart': 'Restart',

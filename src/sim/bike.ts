@@ -84,7 +84,11 @@ export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
 export const effectiveTopSpeed = (b: BikeState, stats: CharacterStats): number =>
   stats.topSpeed * (b.wheelie > 0.5 ? BIKE.wheelieBoost : 1);
 
-export const crashBike = (b: BikeState, cause: 'wall' | 'vehicle' | 'landing', events: SimEvent[]): void => {
+export const crashBike = (
+  b: BikeState,
+  cause: 'wall' | 'vehicle' | 'landing' | 'obstacle',
+  events: SimEvent[],
+): void => {
   if (b.crashTimer > 0 || b.invulnerable > 0) return;
   b.crashTimer = BIKE.crashDuration;
   b.crashes++;
@@ -117,6 +121,8 @@ export interface BikeEnv {
   readonly slope?: number;
   /** Side with no wall (a shortcut mouth): +1 right, -1 left, 0 none. */
   readonly openSide?: number;
+  /** Vertical speed of the road surface under an airborne bike (the height is measured from the road). */
+  readonly roadVy?: number;
 }
 
 /** Advances the bike one fixed step. Pure w.r.t. inputs; mutates `b`. */
@@ -214,7 +220,7 @@ export const stepBike = (
   // --- Vertical ---------------------------------------------------------
   if (b.airborne) {
     b.vy -= BIKE.gravity * dt;
-    b.height += b.vy * dt;
+    b.height += (b.vy - (env.roadVy ?? 0)) * dt;
     if (b.height <= 0) landBike(b, events);
   }
 

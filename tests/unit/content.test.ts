@@ -37,7 +37,7 @@ describe('content', () => {
     for (const k of VEHICLE_KINDS) {
       const v = VEHICLES[k];
       expect(v.minSpeed).toBeLessThanOrEqual(v.maxSpeed);
-      expect(v.weight).toBeGreaterThan(0);
+      expect(v.weight).toBeGreaterThanOrEqual(0);
     }
   });
 });
