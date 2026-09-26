@@ -22,6 +22,8 @@ export const BIKE = {
   wallMargin: 0.6,
   wallCrashLateralSpeed: 9,
   wallScrapeDecel: 12,
+  /** Speed kept after bumping hard into a wall (the rider never falls off against walls). */
+  wallBumpSpeedKeep: 0.75,
   gravity: 20,
   rampLaunchFactor: 0.32,
   landingCrashYaw: 0.75,
@@ -31,6 +33,11 @@ export const BIKE = {
   slopeFactor: 0.45,
   /** Seconds the explosive bonus lasts. */
   explosiveDuration: 8,
+  /** Minimum wheelie amount needed to hop over a vehicle instead of crashing into it. */
+  wheelieHopMin: 0.5,
+  /** Take-off vertical speed range when hopping over a vehicle from a wheelie. */
+  hopMinVy: 3,
+  hopMaxVy: 8,
 } as const;
 
 export interface BikeState {
@@ -58,6 +65,8 @@ export interface BikeState {
   route: number;
   /** > 0 while the explosive bonus is active: vehicles hit blow up instead of knocking the rider down. */
   explosive: number;
+  /** Id of the vehicle the bike is hopping over from a wheelie (-1 = none). */
+  hopOver: number;
 }
 
 export const createBike = (s = 0, d = 3): BikeState => ({
@@ -77,6 +86,7 @@ export const createBike = (s = 0, d = 3): BikeState => ({
   crashes: 0,
   route: -1,
   explosive: 0,
+  hopOver: -1,
 });
 
 export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
@@ -84,12 +94,15 @@ export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
 export const effectiveTopSpeed = (b: BikeState, stats: CharacterStats): number =>
   stats.topSpeed * (b.wheelie > 0.5 ? BIKE.wheelieBoost : 1);
 
-export const crashBike = (b: BikeState, cause: 'wall' | 'vehicle' | 'landing', events: SimEvent[]): void => {
+export const crashBike = (b: BikeState, cause: 'vehicle' | 'landing', events: SimEvent[]): void => {
   if (b.crashTimer > 0 || b.invulnerable > 0) return;
+  // The explosive bonus blows vehicles up instead of knocking the rider down.
+  if (cause === 'vehicle' && b.explosive > 0) return;
   b.crashTimer = BIKE.crashDuration;
   b.crashes++;
   b.wheelie = 0;
   b.wheelieTime = 0;
+  b.hopOver = -1;
   events.push({ type: 'crash', cause });
 };
 
@@ -97,6 +110,30 @@ export const launchBike = (b: BikeState, events: SimEvent[]): void => {
   if (b.airborne || b.speed < 5 || b.crashTimer > 0) return;
   b.airborne = true;
   b.vy = b.speed * BIKE.rampLaunchFactor + (b.wheelie > 0.5 ? 2 : 0);
+  events.push({ type: 'jump' });
+};
+
+/** True when a wheelie is high enough to hop over a vehicle instead of crashing into it. */
+export const canHop = (b: BikeState): boolean =>
+  b.wheelie >= BIKE.wheelieHopMin && !b.airborne && b.crashTimer <= 0;
+
+/**
+ * Pops the bike over a vehicle from a wheelie: it lifts onto the vehicle's roof line and
+ * gets enough vertical speed to clear it at the given closing speed.
+ */
+export const hopBike = (
+  b: BikeState,
+  vehicleId: number,
+  vehicleHeight: number,
+  crossLength: number,
+  closing: number,
+  events: SimEvent[],
+): void => {
+  const crossTime = crossLength / Math.max(closing, 1);
+  b.airborne = true;
+  b.height = Math.max(b.height, vehicleHeight + 0.05);
+  b.vy = clamp((BIKE.gravity * crossTime) / 2, BIKE.hopMinVy, BIKE.hopMaxVy);
+  b.hopOver = vehicleId;
   events.push({ type: 'jump' });
 };
 
@@ -224,13 +261,15 @@ export const stepBike = (
     const side = Math.sign(b.d);
     const lateral = b.speed * Math.sin(b.yaw) * side;
     b.d = side * limit;
-    if (lateral > BIKE.wallCrashLateralSpeed && !b.airborne) {
-      crashBike(b, 'wall', events);
+    if (lateral > BIKE.wallCrashLateralSpeed) {
+      // Hard hit: bounce off and lose some speed, but stay on the bike.
+      b.speed *= BIKE.wallBumpSpeedKeep;
+      b.yaw *= -0.2;
     } else {
       b.speed = Math.max(0, b.speed - (BIKE.wallScrapeDecel / stats.weight) * dt);
       if (b.yaw * side > 0) b.yaw *= 0.5;
-      events.push({ type: 'scrape' });
     }
+    events.push({ type: 'scrape' });
   }
   if (b.s < 0) {
     b.s = 0;
