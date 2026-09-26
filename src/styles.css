@@ -228,28 +228,195 @@ body {
   margin: 0 auto;
 }
 
-.stage-cards {
-  gap: 0.6rem;
-}
-
-.stage-cards .card {
-  width: auto;
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 0.6rem 0.75rem;
-}
-
-.stage-cards .card h2 {
-  font-size: 1.25rem;
-}
-
-.stage-cards .bio {
-  font-size: 0.78rem;
-}
-
 .stage-card.night {
   --accent: #8d99ff;
   background: rgb(222 226 255 / 0.94);
+}
+
+/* Stage select: scrollable list + details of the highlighted stage; the buttons always stay on screen. */
+.select-screen.stage-select {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+.stage-select > :first-child,
+.stage-select > :last-child {
+  margin: 0;
+}
+
+.stage-body {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 1100px;
+}
+
+.stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 0 1 17rem;
+  min-width: 0;
+  max-height: 100%;
+  margin: 0;
+  padding: 0.3rem 0.5rem 0.5rem 0.2rem;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+}
+
+.stage-tile {
+  --accent: var(--red);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.35rem 0.7rem;
+  border: 3px solid var(--ink);
+  border-radius: 0.7rem;
+  background: rgb(255 248 231 / 0.92);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ink);
+  transition: transform 0.15s;
+}
+
+.stage-tile.night {
+  --accent: #8d99ff;
+  background: rgb(222 226 255 / 0.94);
+}
+
+.stage-tile.selected {
+  border-color: var(--accent);
+  background: var(--yellow);
+  transform: translateX(4px);
+  box-shadow:
+    0 0 0 3px var(--ink),
+    0 4px 0 var(--ink);
+}
+
+.stage-tile.locked {
+  filter: grayscale(0.85);
+  opacity: 0.8;
+}
+
+.tile-name {
+  font-weight: 900;
+  font-style: italic;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.tile-info .stars {
+  font-size: 1rem;
+}
+
+.tile-difficulty {
+  color: var(--red);
+  letter-spacing: 0.05em;
+}
+
+.stage-detail {
+  flex: 0 1 25rem;
+  max-width: 26rem;
+  max-height: 100%;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  cursor: default;
+}
+
+.detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.detail-head .counter {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 800;
+  opacity: 0.7;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.3rem;
+  margin: 0.3rem 0;
+}
+
+.fact {
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.4rem;
+  background: rgb(29 27 58 / 0.08);
+}
+
+.fact dt {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.fact dd {
+  margin: 0;
+  font-weight: 900;
+}
+
+.challenges-title {
+  margin-bottom: 0;
+  font-weight: 800;
+}
+
+/* Narrow screens: the list becomes a horizontal strip above the details. */
+@media (max-width: 640px) {
+  .stage-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .stage-list {
+    flex: none;
+    flex-direction: row;
+    max-height: none;
+    padding: 0.2rem 0.2rem 0.6rem;
+    overflow: auto hidden;
+    touch-action: pan-x;
+  }
+
+  .stage-tile {
+    flex: 0 0 10.5rem;
+  }
+
+  .stage-tile.selected {
+    transform: translateY(-2px);
+  }
+
+  .stage-detail {
+    flex: 0 1 auto;
+    max-width: none;
+    min-height: 0;
+  }
 }
 
 .select-screen,
@@ -1120,12 +1287,20 @@ body {
     padding: 0.5rem 0.8rem;
   }
 
-  .stage-cards .card h2 {
-    font-size: 1rem;
+  .stage-detail h2 {
+    font-size: 1.15rem;
   }
 
-  .stage-cards .bio {
-    display: none;
+  .stage-detail .bio {
+    margin: 0.1rem 0 0.2rem;
+  }
+
+  .stage-tile {
+    padding: 0.25rem 0.6rem;
+  }
+
+  .fact {
+    padding: 0.1rem 0.4rem;
   }
 
   .card h2 {

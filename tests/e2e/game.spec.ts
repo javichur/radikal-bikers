@@ -48,7 +48,7 @@ test.describe('desktop', () => {
     await expect(page.locator('[data-character=nitro]')).toHaveClass(/locked/);
     await page.keyboard.press('Enter');
     await expect(page.locator('[data-stage=harborNight]')).toHaveClass(/locked/);
-    await expect(page.locator('[data-stage=harbor] .challenges li')).toHaveCount(3);
+    await expect(page.getByTestId('stage-detail').locator('.challenges li')).toHaveCount(3);
     await page.keyboard.press('Enter');
     await expect(screen(page)).toHaveAttribute('data-screen', 'racing', { timeout: 30_000 });
 
@@ -95,7 +95,8 @@ test.describe('touch (iPhone)', () => {
     await expect(screen(page)).toHaveAttribute('data-screen', 'stageSelect');
     // The first tap selects a stage (the easiest one starts selected), a second one confirms it.
     await page.locator('[data-stage=harbor]').tap();
-    await expect(page.locator('.card.selected')).toHaveAttribute('data-stage', 'harbor');
+    await expect(page.locator('.stage-tile.selected')).toHaveAttribute('data-stage', 'harbor');
+    await expect(page.getByTestId('stage-detail')).toHaveAttribute('data-detail', 'harbor');
     await page.locator('[data-stage=harbor]').tap();
 
     await expect(page.locator('.touch-controls')).toBeVisible();
