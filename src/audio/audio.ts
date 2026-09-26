@@ -118,6 +118,22 @@ export class AudioEngine {
       case 'hurryUp':
         [880, 880, 880].forEach((f, i) => this.tone(f, 0.1, 'square', 0.12, i * 0.18));
         break;
+      case 'pickup':
+        [392, 523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.1, 'square', 0.12, i * 0.05));
+        break;
+      case 'explode':
+        this.burst(1.1, 0.7);
+        this.tone(60, 0.7, 'sawtooth', 0.3);
+        this.tone(45, 0.9, 'square', 0.15, 0.05);
+        break;
+      case 'glass':
+        this.burst(0.25, 0.35);
+        [2600, 3400, 2900, 3900].forEach((f, i) => this.tone(f, 0.12, 'triangle', 0.06, i * 0.04));
+        break;
+      case 'shortcut':
+        this.tone(660, 0.12, 'triangle', 0.12);
+        this.tone(990, 0.18, 'triangle', 0.1, 0.1);
+        break;
       case 'timeUp':
         [392, 330, 262].forEach((f, i) => this.tone(f, 0.3, 'square', 0.15, i * 0.25));
         break;

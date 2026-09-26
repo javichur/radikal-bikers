@@ -21,6 +21,9 @@ export class Hud {
   private readonly progressMarks: HTMLElement;
   private readonly banner: HTMLElement;
   private readonly countdown: HTMLElement;
+  private readonly explosive: HTMLElement;
+  private readonly explosiveLabel: HTMLElement;
+  private readonly explosiveTime: HTMLElement;
   private bannerTimer = 0;
   readonly pauseButton: HTMLButtonElement;
 
@@ -39,6 +42,15 @@ export class Hud {
     this.progressMarks = h('div', { class: 'hud-progress-marks' });
     this.banner = h('div', { class: 'hud-banner' });
     this.countdown = h('div', { class: 'hud-countdown' });
+    this.explosiveLabel = h('span', { class: 'hud-explosive-label' });
+    this.explosiveTime = h('span', { class: 'hud-explosive-time' });
+    this.explosive = h(
+      'div',
+      { class: 'hud-explosive', 'data-testid': 'hud-explosive' },
+      h('span', { class: 'hud-explosive-icon' }, 'TNT'),
+      this.explosiveLabel,
+      this.explosiveTime,
+    );
     this.pauseButton = h(
       'button',
       { class: 'hud-pause', type: 'button', 'aria-label': 'Pause', onclick: onPause },
@@ -66,6 +78,7 @@ export class Hud {
       h('div', { class: 'hud-top-center' }, h('div', { class: 'hud-progress' }, this.progressFill, this.progressMarks)),
       h('div', { class: 'hud-top-right' }, this.scoreLabel, this.score, this.pauseButton),
       h('div', { class: 'hud-speedo' }, svg, h('div', { class: 'hud-speed-text' }, this.speed, this.speedUnit)),
+      this.explosive,
       this.banner,
       this.countdown,
     );
@@ -77,6 +90,7 @@ export class Hud {
     this.timeLabel.textContent = this.i18n.t('hud.time');
     this.scoreLabel.textContent = this.i18n.t('hud.score');
     this.speedUnit.textContent = this.i18n.t('hud.speed');
+    this.explosiveLabel.textContent = this.i18n.t('hud.explosive');
   }
 
   setWorld(world: World): void {
@@ -113,6 +127,10 @@ export class Hud {
     this.gaugeArc.style.strokeDasharray = `${ARC_LEN * frac} ${ARC_LEN * 2}`;
     this.score.textContent = String(world.score);
     this.progressFill.style.width = `${world.progress * 100}%`;
+    const boom = world.bike.explosive;
+    this.explosive.classList.toggle('show', boom > 0);
+    this.explosive.classList.toggle('ending', boom > 0 && boom <= 2);
+    if (boom > 0) this.explosiveTime.textContent = boom.toFixed(1);
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) this.banner.classList.remove('show');

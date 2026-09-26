@@ -10,7 +10,7 @@ import { isTouchDevice, TouchInput } from './input/touch';
 import { combineControls, neutralControls, type MenuAction } from './input/types';
 import { GameRenderer } from './render/renderer';
 import type { SimEvent } from './sim/events';
-import { World } from './sim/world';
+import { EXPLODE_POINTS, World } from './sim/world';
 import { Hud } from './ui/hud';
 import { detectLocale, I18n } from './ui/i18n';
 import { renderScreen, type ResultInfo } from './ui/screens';
@@ -232,6 +232,7 @@ export class Game {
 
   private onSimEvent(e: SimEvent): void {
     this.audio.play(e);
+    this.renderer.onEvent(e);
     const t = this.i18n.t.bind(this.i18n);
     switch (e.type) {
       case 'checkpoint':
@@ -246,6 +247,18 @@ export class Game {
         break;
       case 'jump':
         this.hud.flash(t('hud.jump'), 0.8);
+        break;
+      case 'pickup':
+        this.hud.flash(t('hud.explosive'), 1.4, 'bonus');
+        break;
+      case 'explode':
+        this.hud.flash(t('hud.boom', { p: EXPLODE_POINTS }), 1.2, 'bonus');
+        break;
+      case 'glass':
+        this.hud.flash(t('hud.glass'), 1);
+        break;
+      case 'shortcut':
+        this.hud.flash(t('hud.shortcut'), 1.2, 'checkpoint');
         break;
       case 'finish':
         this.result = this.finishResult(true);

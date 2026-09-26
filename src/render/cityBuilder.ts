@@ -1,120 +1,30 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng';
+import { inRiver, riverOf } from '../sim/scenery';
+import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
 import type { World } from '../sim/world';
-import { canvasTexture, toon, withOutline } from './materials';
+import {
+  bridgeSpan,
+  buildBridge,
+  buildRiver,
+  buildShortcut,
+  buildTunnel,
+  type BuildingRow,
+  type Obstacle,
+} from './landmarks';
+import { toon, withOutline } from './materials';
+import { bannerTexture, roadTexture, stripeTexture, tntTexture, windowTexture } from './textures';
+import { inRanges, ribbon, segments, wall } from './trackGeometry';
 
-const SIDEWALK = 4.5;
 const ROAD_TEX_LENGTH = 16;
 
-const roadTexture = (halfWidth: number, forward: readonly number[], oncoming: readonly number[]): THREE.Texture => {
-  const W = 512;
-  const H = 256;
-  const tex = canvasTexture(W, H, (c) => {
-    c.fillStyle = '#3b3f4a';
-    c.fillRect(0, 0, W, H);
-    for (let i = 0; i < 900; i++) {
-      c.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
-      c.fillRect(Math.random() * W, Math.random() * H, 2, 2);
-    }
-    const x = (d: number): number => ((d + halfWidth) / (halfWidth * 2)) * W;
-    // Edge lines.
-    c.fillStyle = '#f1f1f1';
-    c.fillRect(x(-halfWidth + 0.3), 0, 6, H);
-    c.fillRect(x(halfWidth - 0.3) - 6, 0, 6, H);
-    // Double yellow centre line.
-    c.fillStyle = '#ffd166';
-    c.fillRect(x(0) - 9, 0, 6, H);
-    c.fillRect(x(0) + 3, 0, 6, H);
-    // Dashed lane separators.
-    c.fillStyle = '#f1f1f1';
-    const seps = [...forward, ...oncoming]
-      .sort((a, b) => a - b)
-      .reduce<number[]>((acc, d, i, arr) => {
-        const next = arr[i + 1];
-        if (next !== undefined && Math.sign(d) === Math.sign(next)) acc.push((d + next) / 2);
-        return acc;
-      }, []);
-    for (const d of seps) c.fillRect(x(d) - 3, 0, 6, H * 0.5);
-  });
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-};
-
-const windowTexture = (): THREE.Texture => {
-  const tex = canvasTexture(128, 256, (c) => {
-    c.fillStyle = '#ffffff';
-    c.fillRect(0, 0, 128, 256);
-    for (let y = 12; y < 250; y += 28) {
-      for (let x = 10; x < 120; x += 28) {
-        c.fillStyle = Math.random() < 0.25 ? '#fff3c4' : '#5b6b8c';
-        c.fillRect(x, y, 16, 16);
-      }
-    }
-    c.fillStyle = 'rgba(0,0,0,0.15)';
-    c.fillRect(0, 250, 128, 6);
-  });
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-};
-
-const bannerTexture = (text: string, checkered = false): THREE.Texture =>
-  canvasTexture(512, 96, (c) => {
-    if (checkered) {
-      for (let x = 0; x < 512; x += 24)
-        for (let y = 0; y < 96; y += 24) {
-          c.fillStyle = (x + y) % 48 === 0 ? '#111' : '#fff';
-          c.fillRect(x, y, 24, 24);
-        }
-      c.fillStyle = 'rgba(230,57,70,0.9)';
-      c.fillRect(96, 16, 320, 64);
-    } else {
-      c.fillStyle = '#e63946';
-      c.fillRect(0, 0, 512, 96);
-      c.fillStyle = '#ffd166';
-      c.fillRect(0, 0, 512, 8);
-      c.fillRect(0, 88, 512, 8);
-    }
-    c.fillStyle = '#fff';
-    c.font = 'bold 56px "Trebuchet MS", sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(text, 256, 50);
-  });
-
-/** Builds a ribbon mesh following the track between lateral offsets d0..d1. */
-const ribbon = (
-  world: World,
-  d0: number,
-  d1: number,
-  lift: number,
-  step: number,
-  vScale: number,
-): THREE.BufferGeometry => {
-  const { track } = world;
-  const n = Math.floor(track.length / step) + 1;
-  const pos = new Float32Array(n * 2 * 3);
-  const uv = new Float32Array(n * 2 * 2);
-  const idx: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const s = Math.min(i * step, track.length);
-    const a = track.toWorld(s, d0);
-    const b = track.toWorld(s, d1);
-    pos.set([a.x, a.y + lift, a.z, b.x, b.y + lift, b.z], i * 6);
-    uv.set([0, s / vScale, 1, s / vScale], i * 4);
-    if (i > 0) {
-      const k = i * 2;
-      idx.push(k - 2, k - 1, k, k - 1, k + 1, k);
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  return g;
-};
+export interface CityScene {
+  readonly root: THREE.Group;
+  /** Shop window meshes, per shortcut, in the same order as `route.panes`. */
+  readonly panes: readonly (readonly THREE.Object3D[])[];
+  /** Explosive boxes, in the same order as `world.pickups`. */
+  readonly pickups: readonly THREE.Object3D[];
+}
 
 const gate = (width: number, texture: THREE.Texture): THREE.Group => {
   const g = new THREE.Group();
@@ -150,74 +60,107 @@ const rampGeometry = (width: number, length: number, height: number): THREE.Buff
   return geo;
 };
 
-const stripeTexture = (): THREE.Texture => {
-  const t = canvasTexture(64, 64, (c) => {
-    c.fillStyle = '#ffd166';
-    c.fillRect(0, 0, 64, 64);
-    c.fillStyle = '#222';
-    for (let i = -64; i < 128; i += 22) {
-      c.beginPath();
-      c.moveTo(i, 0);
-      c.lineTo(i + 11, 0);
-      c.lineTo(i + 75, 64);
-      c.lineTo(i + 64, 64);
-      c.fill();
-    }
-  });
-  t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.RepeatWrapping;
-  return t;
+const pickupModel = (tex: THREE.Texture): THREE.Group => {
+  const g = new THREE.Group();
+  const crate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), toon(0xffffff, { map: tex }));
+  crate.castShadow = true;
+  const inner = withOutline(crate, 0.08);
+  inner.name = 'crate';
+  const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 6), toon(0x222222));
+  fuse.position.y = 0.75;
+  const spark = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff8800 }));
+  spark.position.y = 0.98;
+  spark.name = 'spark';
+  inner.add(fuse, spark);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 24), toon(0xffd166, { emissive: 0xb35900 }));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = -0.75;
+  g.add(inner, ring);
+  return g;
 };
 
-/** Static city scenery for a stage: road, sidewalks, buildings, props, gates, ramps. */
-export const buildCity = (world: World): THREE.Group => {
-  const { stage, track } = world;
+/** Static city scenery for a stage: roads, shortcuts, shops, tunnels, bridges, buildings, props and bonuses. */
+export const buildCity = (world: World): CityScene => {
+  const { stage, track, routes } = world;
   const hw = stage.roadHalfWidth;
+  const L = track.length;
   const root = new THREE.Group();
   root.name = 'city';
+  const rng = new Rng(stage.seed);
 
-  // Ground.
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), toon(stage.theme.ground));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.05;
   ground.receiveShadow = true;
   root.add(ground);
 
-  // Road.
   const road = new THREE.Mesh(
-    ribbon(world, -hw - 0.5, hw + 0.5, 0.02, 2, ROAD_TEX_LENGTH),
+    ribbon(track, -hw - 0.5, hw + 0.5, 0.02, 2, ROAD_TEX_LENGTH),
     toon(0xffffff, { map: roadTexture(hw + 0.5, stage.lanes.forward, stage.lanes.oncoming) }),
   );
   road.receiveShadow = true;
   root.add(road);
 
-  // Sidewalks + curbs.
+  const tunnels = stage.tunnels.map((r) => ({ from: r.from * L, to: r.to * L }));
+  const spans = stage.bridges.map((r) => bridgeSpan(world, { from: r.from * L, to: r.to * L }));
+  const rivers = stage.bridges.map((b) => riverOf(track, b));
+
+  // Sidewalks, curbs and embankments, with gaps where shortcuts branch off.
   const walk = toon(0xd9d4c7);
   const curb = toon(0xa8a39a);
+  const skirt = toon(0xb9b2a5, { side: THREE.DoubleSide });
   for (const side of [-1, 1]) {
+    const gaps = routes.filter((r) => r.side === side).flatMap((r) => r.mouths);
     const a = side * (hw + 0.5);
     const b = side * (hw + 0.5 + SIDEWALK);
-    const sw = new THREE.Mesh(ribbon(world, side < 0 ? b : a, side < 0 ? a : b, 0.22, 2, 4), walk);
-    sw.receiveShadow = true;
-    root.add(sw);
-    const cb = new THREE.Mesh(ribbon(world, side < 0 ? a - 0.3 : a, side < 0 ? a : a + 0.3, 0.26, 2, 4), curb);
-    root.add(cb);
+    for (const seg of segments(0, L, gaps)) {
+      const sw = new THREE.Mesh(ribbon(track, Math.min(a, b), Math.max(a, b), 0.22, 2, 4, seg.from, seg.to), walk);
+      sw.receiveShadow = true;
+      root.add(sw);
+      const c0 = side < 0 ? a - 0.3 : a;
+      root.add(new THREE.Mesh(ribbon(track, c0, c0 + 0.3, 0.26, 2, 4, seg.from, seg.to), curb));
+      for (const part of segments(seg.from, seg.to, spans)) {
+        root.add(new THREE.Mesh(wall(track, b, 0, 0.22, part.from, part.to, 2, 4, true), skirt));
+      }
+    }
   }
 
-  // Buildings (instanced), skipping any that would intrude on the road.
-  const rng = new Rng(stage.seed);
+  // Landmarks.
+  const obstacles: Obstacle[] = [];
+  const rows: BuildingRow[] = [];
+  const panes = routes.map((r) => buildShortcut(world, r, root, obstacles, rows, rng));
+  tunnels.forEach((r) => buildTunnel(world, r, root, obstacles));
+  spans.forEach((s) => buildBridge(world, s, root));
+  rivers.forEach((r) => buildRiver(r, root));
+  for (let s = 0; s <= L; s += 6) {
+    const p = track.toWorld(s, 0);
+    obstacles.push({ x: p.x, z: p.z, r: hw + SIDEWALK + 0.3 });
+  }
+
+  // Buildings (instanced), only where the whole footprint is clear of roads, shops, tunnels and water.
   const winTex = windowTexture();
   const bGeo = new THREE.BoxGeometry(1, 1, 1);
   bGeo.translate(0, 0.5, 0);
-  const maxBuildings = Math.ceil(track.length / 12) * 2;
+  const maxBuildings = Math.ceil(L / 8) * 2 + 400;
   const buildings = new THREE.InstancedMesh(bGeo, toon(0xffffff, { map: winTex }), maxBuildings);
   buildings.castShadow = true;
   buildings.receiveShadow = true;
   const roofs = new THREE.InstancedMesh(bGeo, toon(0x6c757d), maxBuildings);
-  const probe: { x: number; z: number }[] = [];
-  for (let s = 0; s <= track.length; s += 6) probe.push(track.toWorld(s, 0));
-  const clearOfRoad = (x: number, z: number, r: number): boolean =>
-    probe.every((p) => Math.hypot(p.x - x, p.z - z) > hw + SIDEWALK + r);
+  const footprintClear = (x: number, z: number, h: number, w: number, depth: number): boolean => {
+    const fx = Math.sin(h);
+    const fz = Math.cos(h);
+    const pts: [number, number][] = [];
+    for (const u of [-0.5, 0, 0.5])
+      for (const v of [-0.5, 0, 0.5]) pts.push([x + fx * u * w - fz * v * depth, z + fz * u * w + fx * v * depth]);
+    const reach = Math.hypot(w, depth) / 2;
+    return (
+      rivers.every((r) => !inRiver(r, x, z, reach + 3)) &&
+      obstacles.every((o) => {
+        if (Math.abs(o.x - x) > o.r + reach || Math.abs(o.z - z) > o.r + reach) return true;
+        return pts.every(([px, pz]) => Math.hypot(px - o.x, pz - o.z) > o.r);
+      })
+    );
+  };
 
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -226,38 +169,55 @@ export const buildCity = (world: World): THREE.Group => {
   let count = 0;
   const propsTrees: THREE.Matrix4[] = [];
   const propsLamps: THREE.Matrix4[] = [];
-  for (const side of [-1, 1]) {
-    let s = -30;
-    while (s < track.length + 30 && count < maxBuildings) {
+  const placeRow = (row: BuildingRow): void => {
+    const t = world.trackOf(row.route);
+    const side = Math.sign(row.offset);
+    let s = row.from;
+    while (s < row.to && count < maxBuildings) {
       const w = rng.range(10, 20);
       const depth = rng.range(10, 18);
-      const h = rng.range(9, 42);
-      const sc = s + w / 2;
-      const off = side * (hw + SIDEWALK + 1.5 + depth / 2);
-      const p = track.toWorld(Math.min(Math.max(sc, 0), track.length), off);
-      if (clearOfRoad(p.x, p.z, Math.hypot(w, depth) / 2 - 1.5)) {
+      const h = rng.range(row.minHeight, row.maxHeight);
+      const sc = Math.min(Math.max(s + w / 2, 0), t.length);
+      const p = t.toWorld(sc, row.offset + side * (depth / 2));
+      if (footprintClear(p.x, p.z, p.heading, w, depth)) {
+        const top = h + Math.max(0, p.y);
         q.setFromAxisAngle(up, p.heading);
-        m.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(w, h, depth));
+        m.compose(new THREE.Vector3(p.x, -0.05, p.z), q, new THREE.Vector3(w, top, depth));
         buildings.setMatrixAt(count, m);
         color.setHex(rng.pick(stage.theme.buildings));
         buildings.setColorAt(count, color);
-        m.compose(new THREE.Vector3(p.x, p.y + h, p.z), q, new THREE.Vector3(w + 0.6, 0.8, depth + 0.6));
+        m.compose(new THREE.Vector3(p.x, top - 0.05, p.z), q, new THREE.Vector3(w + 0.6, 0.8, depth + 0.6));
         roofs.setMatrixAt(count, m);
         count++;
       }
-      if (rng.next() < 0.6 && sc > 0 && sc < track.length) {
-        const pp = track.toWorld(s, side * (hw + 2.8));
-        const mat = new THREE.Matrix4().makeTranslation(pp.x, pp.y + 0.2, pp.z);
-        (rng.next() < 0.5 ? propsTrees : propsLamps).push(mat);
-      }
       s += w + rng.range(1, 6);
     }
+  };
+  const mouthsBySide = (side: number) => routes.filter((r) => r.side === side).flatMap((r) => r.mouths);
+  for (const side of [-1, 1]) {
+    placeRow({
+      route: -1,
+      from: -30,
+      to: L + 30,
+      offset: side * (hw + SIDEWALK + FACADE_GAP),
+      minHeight: 9,
+      maxHeight: 42,
+    });
+    const gaps = mouthsBySide(side);
+    for (let s = 4; s < L; s += rng.range(9, 16)) {
+      if (inRanges(s, gaps, 3) || inRanges(s, tunnels, 2)) continue;
+      const onBridge = inRanges(s, spans);
+      if (rng.next() >= 0.6) continue;
+      const pp = track.toWorld(s, side * (hw + 2.8));
+      const mat = new THREE.Matrix4().makeTranslation(pp.x, pp.y + 0.2, pp.z);
+      (!onBridge && rng.next() < 0.5 ? propsTrees : propsLamps).push(mat);
+    }
   }
+  rows.forEach(placeRow);
   buildings.count = count;
   roofs.count = count;
   root.add(buildings, roofs);
 
-  // Trees.
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 2, 6);
   trunkGeo.translate(0, 1, 0);
   const crownGeo = new THREE.IcosahedronGeometry(1.4, 0);
@@ -269,7 +229,6 @@ export const buildCity = (world: World): THREE.Group => {
     trunks.setMatrixAt(i, mt);
     crowns.setMatrixAt(i, mt);
   });
-  // Lamps.
   const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 5, 6);
   poleGeo.translate(0, 2.5, 0);
   const bulbGeo = new THREE.SphereGeometry(0.3, 8, 6);
@@ -298,8 +257,7 @@ export const buildCity = (world: World): THREE.Group => {
   // Ramps.
   const stripes = stripeTexture();
   for (const r of world.ramps) {
-    const len = 4;
-    const ramp = new THREE.Mesh(rampGeometry(r.width, len, 1), toon(0xffffff, { map: stripes }));
+    const ramp = new THREE.Mesh(rampGeometry(r.width, 4, 1), toon(0xffffff, { map: stripes }));
     const p = track.toWorld(r.s, r.d);
     ramp.position.set(p.x, p.y, p.z);
     ramp.rotation.y = p.heading;
@@ -308,5 +266,15 @@ export const buildCity = (world: World): THREE.Group => {
     root.add(ramp);
   }
 
-  return root;
+  // Explosive bonus boxes.
+  const tnt = tntTexture();
+  const pickups = world.pickups.map((pk) => {
+    const g = pickupModel(tnt);
+    const p = world.trackOf(pk.route).toWorld(pk.s, pk.d);
+    g.position.set(p.x, p.y + 0.95, p.z);
+    root.add(g);
+    return g;
+  });
+
+  return { root, panes, pickups };
 };

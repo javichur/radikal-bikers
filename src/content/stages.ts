@@ -1,9 +1,21 @@
+export interface ShortcutDef {
+  /** Course fractions where the shortcut leaves and rejoins the main road. */
+  readonly from: number;
+  readonly to: number;
+  /** Side of the main road it branches off: +1 right, -1 left. */
+  readonly side: 1 | -1;
+  /** Alleys are plain back streets; shops put a store (with breakable windows) at each end. */
+  readonly kind: 'alley' | 'shop';
+}
+
 export interface StageDef {
   readonly id: string;
   readonly nameKey: string;
   readonly descriptionKey: string;
   /** Road centreline control points: [x, z, elevation]. */
   readonly controlPoints: readonly (readonly [number, number, number])[];
+  /** Road elevation keys (course fraction → metres) for hills, crests and bridges. Overrides the control points. */
+  readonly profile?: readonly { readonly at: number; readonly y: number }[];
   /** Half of the drivable road width, metres. */
   readonly roadHalfWidth: number;
   /** Lateral offsets of the lane centres (positive = right). */
@@ -17,6 +29,14 @@ export interface StageDef {
   readonly checkpoints: readonly { readonly at: number; readonly bonus: number }[];
   /** Jump ramps as fractions of the course length. */
   readonly ramps: readonly { readonly at: number; readonly d: number; readonly width: number }[];
+  /** Alternative routes that cut corners (no traffic, but narrow). */
+  readonly shortcuts: readonly ShortcutDef[];
+  /** Covered sections of the main road, as course fractions. */
+  readonly tunnels: readonly { readonly from: number; readonly to: number }[];
+  /** Raised sections over a river, as course fractions (the profile must lift the road there). */
+  readonly bridges: readonly { readonly from: number; readonly to: number }[];
+  /** Explosive bonus boxes. `route` is -1 for the main road or a shortcut index; `at` is a fraction of it. */
+  readonly pickups: readonly { readonly route: number; readonly at: number; readonly d: number }[];
   /** Target amount of traffic vehicles around the player. */
   readonly trafficDensity: number;
   readonly theme: {
@@ -68,6 +88,42 @@ export const STAGES: readonly StageDef[] = [
       { at: 0.4, d: -6, width: 8 },
       { at: 0.63, d: 6, width: 8 },
       { at: 0.85, d: 0, width: 10 },
+    ],
+    profile: [
+      { at: 0, y: 0 },
+      { at: 0.045, y: 0 },
+      { at: 0.053, y: 2.6 },
+      { at: 0.061, y: 0.4 },
+      { at: 0.069, y: 3 },
+      { at: 0.077, y: 0 },
+      { at: 0.29, y: 0 },
+      { at: 0.31, y: 9 },
+      { at: 0.37, y: 9 },
+      { at: 0.39, y: 0 },
+      { at: 0.72, y: 0 },
+      { at: 0.728, y: 3.2 },
+      { at: 0.736, y: 0.6 },
+      { at: 0.744, y: 3.4 },
+      { at: 0.752, y: 0.8 },
+      { at: 0.76, y: 3 },
+      { at: 0.768, y: 0 },
+      { at: 1, y: 0 },
+    ],
+    shortcuts: [
+      { from: 0.13, to: 0.29, side: -1, kind: 'alley' },
+      { from: 0.415, to: 0.515, side: 1, kind: 'shop' },
+      { from: 0.61, to: 0.71, side: 1, kind: 'alley' },
+      { from: 0.785, to: 0.88, side: -1, kind: 'shop' },
+    ],
+    tunnels: [{ from: 0.53, to: 0.6 }],
+    bridges: [{ from: 0.3, to: 0.38 }],
+    pickups: [
+      { route: -1, at: 0.09, d: 6 },
+      { route: -1, at: 0.42, d: -6 },
+      { route: -1, at: 0.61, d: 3 },
+      { route: -1, at: 0.9, d: -3 },
+      { route: 0, at: 0.5, d: 0 },
+      { route: 2, at: 0.5, d: 0 },
     ],
     trafficDensity: 16,
     theme: {
