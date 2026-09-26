@@ -70,10 +70,14 @@ export class UpdateChecker {
 
 /** Fetches `version.json` bypassing HTTP and browser caches. */
 export const fetchDeployedVersion = async (baseUrl: string): Promise<string | null> => {
-  const url = new URL('version.json', baseUrl);
-  url.searchParams.set('t', String(Date.now()));
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { version?: unknown };
-  return typeof data.version === 'string' ? data.version : null;
+  try {
+    const url = new URL('version.json', baseUrl);
+    url.searchParams.set('t', String(Date.now()));
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { version?: unknown };
+    return typeof data.version === 'string' ? data.version : null;
+  } catch {
+    return null;
+  }
 };

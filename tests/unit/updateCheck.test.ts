@@ -84,4 +84,11 @@ describe('fetchDeployedVersion', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }));
     await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
   });
+
+  it('returns null on fetch or JSON failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.reject(new Error('bad json')) }));
+    await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
+  });
 });
