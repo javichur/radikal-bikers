@@ -4,7 +4,9 @@ import { damp, lerp, wrapAngle } from '../core/math';
 import { BIKE } from '../sim/bike';
 import type { World } from '../sim/world';
 import { buildBike, BIKE_WHEEL_RADIUS, type BikeRig } from './bikeModel';
-import { buildCity } from './cityBuilder';
+import type { SimEvent } from '../sim/events';
+import { buildCity, type CityScene } from './cityBuilder';
+import { Effects } from './effects';
 import { buildVehicle } from './vehicleModel';
 
 export type CameraMode = 'chase' | 'showcase' | 'orbit';
@@ -16,7 +18,9 @@ export class GameRenderer {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(62, 1, 0.1, 900);
   private readonly sun = new THREE.DirectionalLight(0xffffff, 2.2);
-  private city: THREE.Group | null = null;
+  private city: CityScene | null = null;
+  private readonly effects: Effects;
+  private aura: THREE.Mesh | null = null;
   private bike: BikeRig | null = null;
   private readonly vehicles = new Map<number, THREE.Group>();
   private world: World | null = null;
@@ -49,6 +53,7 @@ export class GameRenderer {
     sc.far = 220;
     this.sun.shadow.bias = -0.0005;
     this.scene.add(this.sun, this.sun.target);
+    this.effects = new Effects(this.scene);
     this.resize();
   }
 
@@ -62,9 +67,9 @@ export class GameRenderer {
 
   setWorld(world: World): void {
     if (this.world?.stage.id !== world.stage.id || !this.city) {
-      if (this.city) this.scene.remove(this.city);
+      if (this.city) this.scene.remove(this.city.root);
       this.city = buildCity(world);
-      this.scene.add(this.city);
+      this.scene.add(this.city.root);
       const t = world.stage.theme;
       this.scene.background = new THREE.Color(t.sky);
       this.scene.fog = new THREE.Fog(t.fog, 120, 520);
@@ -73,13 +78,60 @@ export class GameRenderer {
     this.setCharacter(world.character);
     for (const g of this.vehicles.values()) this.scene.remove(g);
     this.vehicles.clear();
-    this.camHeading = world.track.sample(world.bike.s).heading;
+    this.camHeading = world.currentTrack.sample(world.bike.s).heading;
+    this.effects.clear();
   }
 
   setCharacter(c: CharacterDef): void {
     if (this.bike) this.scene.remove(this.bike.root);
     this.bike = buildBike(c);
+    this.bike.root.rotation.order = 'YXZ';
+    // Pulsing shell shown while the explosive bonus is active.
+    this.aura = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(1.25, 1),
+      new THREE.MeshBasicMaterial({ color: 0xff7b00, transparent: true, opacity: 0.25, wireframe: true }),
+    );
+    this.aura.position.y = 0.9;
+    this.aura.visible = false;
+    this.bike.root.add(this.aura);
     this.scene.add(this.bike.root);
+  }
+
+  /** Visual reaction to simulation events (explosions, broken glass, bonus pickups). */
+  onEvent(e: SimEvent): void {
+    const world = this.world;
+    if (!world) return;
+    switch (e.type) {
+      case 'explode': {
+        const p = world.track.toWorld(e.s, e.d);
+        this.effects.explosion(new THREE.Vector3(p.x, p.y + 0.8, p.z));
+        this.addShake(0.9);
+        break;
+      }
+      case 'glass': {
+        const pane = this.city?.panes[e.route]?.[e.pane];
+        if (pane) {
+          const pos = pane.getWorldPosition(new THREE.Vector3());
+          const b = world.bike;
+          const p = world.currentTrack.toWorld(b.s, b.d);
+          const h = p.heading - b.yaw;
+          this.effects.glass(
+            pos,
+            new THREE.Vector3(Math.sin(h), 0, Math.cos(h)).multiplyScalar(Math.max(4, b.speed * 0.5)),
+          );
+        }
+        this.addShake(0.3);
+        break;
+      }
+      case 'pickup': {
+        const b = world.bike;
+        const p = world.currentTrack.toWorld(b.s, b.d);
+        this.effects.sparkle(new THREE.Vector3(p.x, p.y + b.height + 1, p.z));
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   addShake(amount: number): void {
@@ -92,17 +144,29 @@ export class GameRenderer {
     if (world && this.bike) {
       this.syncBike(world, this.bike, dt);
       this.syncTraffic(world);
+      this.syncCity(world);
       this.updateCamera(world, dt);
     }
+    this.effects.update(dt);
     this.renderer.render(this.scene, this.camera);
   }
 
   private syncBike(world: World, rig: BikeRig, dt: number): void {
     const b = world.bike;
-    const p = world.track.toWorld(b.s, b.d);
+    const t = world.currentTrack;
+    const p = t.toWorld(b.s, b.d);
     const heading = p.heading - b.yaw;
     rig.root.position.set(p.x, p.y + b.height, p.z);
     rig.root.rotation.y = heading;
+    // Follow the road gradient (projected on the bike's actual direction of travel).
+    const slope = b.airborne ? 0 : t.sample(b.s).slope * Math.cos(b.yaw);
+    rig.root.rotation.x = lerp(rig.root.rotation.x, -Math.atan(slope), damp(10, dt));
+    rig.setSteer(b.crashTimer > 0 ? 0 : -b.lean * 0.35);
+    if (this.aura) {
+      this.aura.visible = b.explosive > 0 && (b.explosive > 2 || Math.floor(this.time * 8) % 2 === 0);
+      this.aura.rotation.y += dt * 3;
+      this.aura.scale.setScalar(1 + Math.sin(this.time * 10) * 0.06);
+    }
     const crashed = b.crashTimer > 0;
     rig.lean.rotation.z = crashed ? lerp(rig.lean.rotation.z, 1.35, damp(6, dt)) : b.lean * 0.45;
     rig.pitch.rotation.x = -b.wheelie * 0.55 + (b.airborne ? -Math.min(0.25, b.vy * 0.02) : 0);
@@ -127,7 +191,9 @@ export class GameRenderer {
       }
       const p = world.track.toWorld(v.s, v.d);
       g.position.set(p.x, p.y, p.z);
+      g.rotation.order = 'YXZ';
       g.rotation.y = v.dir === 1 ? p.heading : p.heading + Math.PI;
+      g.rotation.x = -Math.atan(world.track.sample(v.s).slope * v.dir);
     }
     for (const [id, g] of this.vehicles) {
       if (!alive.has(id)) {
@@ -137,9 +203,33 @@ export class GameRenderer {
     }
   }
 
+  /** The city is only rebuilt per stage, so dynamic bits (glass, bonuses) are synced every frame. */
+  private syncCity(world: World): void {
+    const city = this.city;
+    if (!city) return;
+    world.routes.forEach((r, i) => {
+      r.panes.forEach((pane, j) => {
+        const m = city.panes[i]?.[j];
+        if (m) m.visible = !pane.broken;
+      });
+    });
+    world.pickups.forEach((pk, i) => {
+      const g = city.pickups[i];
+      if (!g) return;
+      g.visible = pk.respawn <= 0;
+      const crate = g.getObjectByName('crate');
+      if (crate) {
+        crate.rotation.y = this.time * 1.8 + i;
+        crate.position.y = Math.sin(this.time * 3 + i) * 0.15;
+      }
+      const spark = g.getObjectByName('spark');
+      if (spark) spark.scale.setScalar(0.8 + Math.abs(Math.sin(this.time * 14 + i)) * 0.6);
+    });
+  }
+
   private updateCamera(world: World, dt: number): void {
     const b = world.bike;
-    const p = world.track.toWorld(b.s, b.d);
+    const p = world.currentTrack.toWorld(b.s, b.d);
     const target = new THREE.Vector3(p.x, p.y + b.height * 0.6, p.z);
 
     if (this.mode === 'chase') {

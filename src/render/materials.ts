@@ -15,11 +15,19 @@ export const toonGradient = (): THREE.DataTexture => {
 
 const cache = new Map<string, THREE.MeshToonMaterial>();
 
-export const toon = (color: number, opts: { map?: THREE.Texture; emissive?: number } = {}): THREE.MeshToonMaterial => {
-  const key = `${color}:${opts.map?.uuid ?? ''}:${opts.emissive ?? ''}`;
+export const toon = (
+  color: number,
+  opts: { map?: THREE.Texture; emissive?: number; side?: THREE.Side } = {},
+): THREE.MeshToonMaterial => {
+  const key = `${color}:${opts.map?.uuid ?? ''}:${opts.emissive ?? ''}:${opts.side ?? ''}`;
   let m = cache.get(key);
   if (!m) {
-    m = new THREE.MeshToonMaterial({ color, gradientMap: toonGradient(), map: opts.map ?? null });
+    m = new THREE.MeshToonMaterial({
+      color,
+      gradientMap: toonGradient(),
+      map: opts.map ?? null,
+      side: opts.side ?? THREE.FrontSide,
+    });
     if (opts.emissive !== undefined) m.emissive = new THREE.Color(opts.emissive);
     cache.set(key, m);
   }

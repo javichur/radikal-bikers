@@ -300,4 +300,3 @@ describe('hills', () => {
     expect(climb.bike.speed).toBeLessThan(flat.bike.speed - 1);
   });
 });
-

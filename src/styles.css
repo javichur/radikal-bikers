@@ -470,6 +470,57 @@ body {
   color: var(--teal);
 }
 
+.hud-banner.bonus {
+  color: #ff7b00;
+}
+
+.hud-explosive {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.3rem 0.8rem;
+  border: 3px solid var(--ink);
+  border-radius: 0.6rem;
+  background: #ff7b00;
+  color: #fff;
+  font-style: italic;
+  opacity: 0;
+  transform: translateX(-50%) scale(0.6);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+  pointer-events: none;
+}
+
+.hud-explosive.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.hud-explosive.ending {
+  animation: hud-blink 0.3s steps(2) infinite;
+}
+
+.hud-explosive-icon {
+  padding: 0 0.3rem;
+  background: var(--red);
+  border-radius: 0.2rem;
+}
+
+.hud-explosive-time {
+  min-width: 2.5ch;
+  color: var(--yellow);
+}
+
+@keyframes hud-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .hud-banner.go {
   font-size: clamp(3rem, 12vw, 7rem);
 }
