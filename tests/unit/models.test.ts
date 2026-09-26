@@ -2,10 +2,13 @@
 import * as THREE from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../../src/content/characters';
+import { MONUMENT_KINDS } from '../../src/content/monuments';
+import { OBSTACLES, type ObstacleKind } from '../../src/content/obstacles';
 import { STAGES } from '../../src/content/stages';
 import { buildBike, solveTwoBone } from '../../src/render/bikeModel';
 import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
+import { monumentModel } from '../../src/render/monuments';
 import { obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
 import { buildVehicle } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
@@ -64,15 +67,27 @@ describe('city builder', () => {
   );
 
   it('poses knocked-over obstacles and stands them back up', () => {
-    for (const kind of ['cones', 'barrier', 'fountain'] as const) {
+    for (const kind of Object.keys(OBSTACLES) as ObstacleKind[]) {
       const g = obstacleModel(kind);
+      expect(g.children.length).toBeGreaterThan(0);
       const before = g.clone(true);
       poseObstacle(kind, g, true);
-      if (kind !== 'fountain') expect(JSON.stringify(g.toJSON())).not.toBe(JSON.stringify(before.toJSON()));
+      if (!OBSTACLES[kind].indestructible) {
+        expect(JSON.stringify(g.toJSON())).not.toBe(JSON.stringify(before.toJSON()));
+      }
       poseObstacle(kind, g, false);
       g.updateMatrixWorld(true);
       before.updateMatrixWorld(true);
       g.children.forEach((c, i) => expect(c.matrixWorld.equals(before.children[i]!.matrixWorld)).toBe(true));
+    }
+  });
+
+  it('builds every monument kind with a sensible size', () => {
+    for (const kind of MONUMENT_KINDS) {
+      const box = new THREE.Box3().setFromObject(monumentModel(kind));
+      const size = box.getSize(new THREE.Vector3());
+      expect(size.y).toBeGreaterThan(3);
+      expect(size.y).toBeLessThan(80);
     }
   });
 

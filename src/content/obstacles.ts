@@ -1,4 +1,4 @@
-export type ObstacleKind = 'cones' | 'barrier' | 'fountain';
+export type ObstacleKind = 'cones' | 'barrier' | 'fountain' | 'falla' | 'terrassa';
 
 export interface ObstacleDef {
   readonly kind: ObstacleKind;
@@ -20,4 +20,8 @@ export const OBSTACLES: Readonly<Record<ObstacleKind, ObstacleDef>> = {
   barrier: { kind: 'barrier', halfLength: 2.5, halfWidth: 0.9, height: 1.1, solid: true },
   /** Square fountain in the middle of a piazza: traffic flows on both sides. */
   fountain: { kind: 'fountain', halfLength: 2, halfWidth: 2, height: 2.6, solid: true, indestructible: true },
+  /** Falla monument planted in the middle of a square for the March festival: traffic flows on both sides. */
+  falla: { kind: 'falla', halfLength: 1.6, halfWidth: 1.6, height: 9, solid: true, indestructible: true },
+  /** Café terrace (tables, chairs and a parasol) spilling onto the kerb lane: knocked over at a speed cost. */
+  terrassa: { kind: 'terrassa', halfLength: 2.5, halfWidth: 0.55, height: 1.1, solid: false },
 };

@@ -28,6 +28,9 @@ import {
 } from './textures';
 import { rangesWhere, ribbon, segments, sweep, wall } from './trackGeometry';
 
+/** Lawn of parks and dry riverbeds. */
+export const PARK_GREEN = 0x7fbf5a;
+
 /** Circular keep-out zone for procedural buildings. */
 export interface Obstacle {
   readonly x: number;
@@ -51,6 +54,15 @@ const SHOPS = [
   { name: 'MODA', color: 0xffc6ff, sign: '#7209b7', awning: '#b5179e' },
   { name: 'TV·HIFI', color: 0xa0c4ff, sign: '#1d3557', awning: '#e63946' },
   { name: 'CAFÉ', color: 0xffd6a5, sign: '#6f4518', awning: '#e76f51' },
+];
+
+/** Local shops of the València stage: market stalls, horchata bars, fartons, fallas crafts and ceramics. */
+const VALENCIA_SHOPS = [
+  { name: 'MERCAT', color: 0xfff1d0, sign: '#2a6fb0', awning: '#f4a261' },
+  { name: 'ORXATA', color: 0xfdf6e3, sign: '#8a5a2b', awning: '#2a9d8f' },
+  { name: 'FARTONS', color: 0xffe8c2, sign: '#c8643b', awning: '#ffbe0b' },
+  { name: 'FALLES', color: 0xffd6e0, sign: '#e63946', awning: '#8338ec' },
+  { name: 'CERÀMICA', color: 0xe0f0ff, sign: '#1d4e89', awning: '#2a6fb0' },
 ];
 
 let glass: THREE.MeshPhongMaterial | null = null;
@@ -260,7 +272,8 @@ export const buildShortcut = (
   }
 
   const panes: THREE.Object3D[] = [];
-  route.shops.forEach((r) => buildShop(world, route, r, root, obstacles, panes, rng.pick(SHOPS)));
+  const styles = world.stage.scenery === 'valencia' ? VALENCIA_SHOPS : SHOPS;
+  route.shops.forEach((r) => buildShop(world, route, r, root, obstacles, panes, rng.pick(styles)));
   return panes;
 };
 
@@ -433,19 +446,24 @@ export const buildBridge = (world: World, span: Range, root: THREE.Group): void 
   }
 };
 
-/** River strip with stone banks and a couple of moored boats. */
+/** River strip with stone banks and a couple of moored boats, or a dry riverbed laid out as a lawn. */
 export const buildRiver = (river: River, root: THREE.Group): void => {
   const g = new THREE.Group();
   g.position.set(river.x, 0, river.z);
   g.rotation.y = river.heading;
   const waterGeo = new THREE.PlaneGeometry(river.halfLength * 2, river.halfWidth * 2);
   waterGeo.rotateX(-Math.PI / 2);
-  const tex = waterTexture();
-  tex.repeat.set(river.halfLength / 10, river.halfWidth / 10);
-  const water = new THREE.Mesh(waterGeo, toon(0xffffff, { map: tex }));
-  water.position.y = 0.04;
-  water.receiveShadow = true;
-  g.add(water);
+  let bed: THREE.Mesh;
+  if (river.dry) {
+    bed = new THREE.Mesh(waterGeo, toon(PARK_GREEN));
+  } else {
+    const tex = waterTexture();
+    tex.repeat.set(river.halfLength / 10, river.halfWidth / 10);
+    bed = new THREE.Mesh(waterGeo, toon(0xffffff, { map: tex }));
+  }
+  bed.position.y = 0.04;
+  bed.receiveShadow = true;
+  g.add(bed);
   const bankGeo = new THREE.BoxGeometry(river.halfLength * 2, 0.8, 1.4);
   for (const k of [-1, 1]) {
     const bank = new THREE.Mesh(bankGeo, toon(0x9a8c7a));
@@ -456,6 +474,7 @@ export const buildRiver = (river: River, root: THREE.Group): void => {
     [-70, -18, 0xe63946],
     [95, 22, 0xffd166],
   ] as const) {
+    if (river.dry || Math.abs(x) > river.halfLength - 6 || Math.abs(z) > river.halfWidth - 2) continue;
     const hull = new THREE.Mesh(new THREE.BoxGeometry(9, 1.2, 3), toon(c));
     hull.position.set(x, 0.5, z);
     const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.6, 2.2), toon(0xf1faee));

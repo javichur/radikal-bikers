@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { OBSTACLES, type ObstacleKind } from '../content/obstacles';
 import type { SceneryStyle } from '../content/stages';
 import { BARRIER_OFFSET, RAIL_HALF_WIDTH, TRAIN_LENGTH } from '../sim/crossing';
@@ -26,7 +27,7 @@ export interface SceneryLook {
   readonly sheds: boolean;
   readonly sidewalk: number;
   readonly curb: number;
-  readonly tree: 'round' | 'palm' | 'cypress';
+  readonly tree: 'round' | 'palm' | 'cypress' | 'orange';
   /** Chance of a roadside prop at each slot, and of that prop being a tree rather than a street lamp. */
   readonly propChance: number;
   readonly treeChance: number;
@@ -106,10 +107,28 @@ export const LOOKS: Readonly<Record<SceneryStyle, SceneryLook>> = {
     treeChance: 1,
     guardrails: true,
   },
+  valencia: {
+    ...CITY,
+    // Continuous Eixample blocks of 6-8 storeys with glazed-tile roofs; orange trees and granite kerbs.
+    buildingWidth: [12, 22],
+    buildingDepth: [14, 22],
+    mainHeight: [19, 27],
+    routeHeight: [12, 19],
+    rowGap: [0, 0.6],
+    roof: 0x2a6fb0,
+    sidewalk: 0xe6dccb,
+    curb: 0x9a958c,
+    tree: 'orange',
+    propChance: 0.65,
+    treeChance: 0.6,
+    tunnel: 'arcade',
+  },
 };
 
-/** Tree geometries (trunk + crown), origin at the foot. */
-export const treeGeometries = (kind: SceneryLook['tree']): [THREE.BufferGeometry, THREE.BufferGeometry, number] => {
+/** Tree geometries (trunk + crown, and fruit for orange trees), origin at the foot. */
+export const treeGeometries = (
+  kind: SceneryLook['tree'],
+): [THREE.BufferGeometry, THREE.BufferGeometry, number, THREE.BufferGeometry?] => {
   switch (kind) {
     case 'palm': {
       const trunk = new THREE.CylinderGeometry(0.16, 0.26, 6.5, 6);
@@ -125,6 +144,23 @@ export const treeGeometries = (kind: SceneryLook['tree']): [THREE.BufferGeometry
       const crown = new THREE.ConeGeometry(0.9, 7, 8);
       crown.translate(0, 4.1, 0);
       return [trunk, crown, 0x2d6a4f];
+    }
+    case 'orange': {
+      // Orange tree: short trunk and a round dark crown dotted with fruit.
+      const trunk = new THREE.CylinderGeometry(0.13, 0.18, 1.6, 6);
+      trunk.translate(0, 0.8, 0);
+      const crown = new THREE.IcosahedronGeometry(1.3, 1);
+      crown.translate(0, 2.5, 0);
+      const fruits: THREE.BufferGeometry[] = [];
+      for (let i = 0; i < 9; i++) {
+        const a = i * 2.4;
+        const y = Math.sin(i * 1.7) * 0.8;
+        const r = Math.sqrt(1.3 * 1.3 - y * y) + 0.05;
+        const fruit = new THREE.IcosahedronGeometry(0.17, 0);
+        fruit.translate(Math.cos(a) * r, 2.5 + y, Math.sin(a) * r);
+        fruits.push(fruit);
+      }
+      return [trunk, crown, 0x2f7d32, mergeGeometries(fruits)];
     }
     default: {
       const trunk = new THREE.CylinderGeometry(0.15, 0.2, 2, 6);
@@ -147,6 +183,17 @@ export const buildSea = (poly: readonly (readonly [number, number])[], root: THR
   sea.position.y = 0.02;
   sea.receiveShadow = true;
   root.add(sea);
+};
+
+/** Park lawn over a world XZ polygon (just above the ground, under roads and water). */
+export const buildPark = (poly: readonly (readonly [number, number])[], color: number, root: THREE.Group): void => {
+  const shape = new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, -z)));
+  const geo = new THREE.ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+  const park = new THREE.Mesh(geo, toon(color));
+  park.position.y = -0.02;
+  park.receiveShadow = true;
+  root.add(park);
 };
 
 /** Beach umbrella with a striped canopy. */
@@ -243,6 +290,69 @@ export const obstacleModel = (kind: ObstacleKind): THREE.Group => {
       g.add(withOutline(basin, 0.06), water, column, bowl, jet);
       break;
     }
+    case 'falla': {
+      // Ninot-topped falla: a painted plinth, a stack of bright figures and a giant head with a party hat.
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(def.halfWidth, def.halfWidth + 0.1, 1.6, 8),
+        toon(0xf4a259),
+      );
+      base.position.y = 0.8;
+      base.castShadow = true;
+      g.add(withOutline(base, 0.06));
+      const tiers: [number, number, number, number][] = [
+        [1.3, 1.6, 2.4, 0xe63946],
+        [1.0, 1.2, 3.8, 0x3a86ff],
+        [0.8, 1.2, 5.0, 0xffbe0b],
+      ];
+      for (const [r, h, y, color] of tiers) {
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r, h, 7), toon(color));
+        t.position.y = y;
+        t.rotation.y = y;
+        t.castShadow = true;
+        g.add(withOutline(t, 0.05));
+      }
+      const head = new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 8), toon(0xffd6a5));
+      head.position.y = 6.8;
+      head.castShadow = true;
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), toon(0xff7b7b));
+      nose.position.set(0, 6.7, 1.15);
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.6, 8), toon(0x8338ec));
+      hat.position.y = 8.3;
+      g.add(withOutline(head, 0.06), nose, hat);
+      for (const x of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 2.2, 6), toon(0xffd6a5));
+        arm.position.set(x * 1.3, 5.6, 0);
+        arm.rotation.z = x * -0.9;
+        g.add(arm);
+      }
+      break;
+    }
+    case 'terrassa': {
+      // Café terrace along the kerb: two tables with chairs under parasols.
+      const metal = toon(0x9aa0a6);
+      const cloth = toon(0xf1faee);
+      for (const z of [-def.halfLength * 0.5, def.halfLength * 0.5]) {
+        const set = new THREE.Group();
+        set.position.z = z;
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.05, 10), cloth);
+        top.position.y = 0.75;
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.75, 5), metal);
+        leg.position.y = 0.37;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4, 5), metal);
+        pole.position.y = 1.4;
+        const parasol = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.35, 8), toon(z < 0 ? 0xe63946 : 0xffbe0b));
+        parasol.position.y = 2.1;
+        parasol.castShadow = true;
+        set.add(top, leg, pole, parasol);
+        for (const dz of [-0.7, 0.7]) {
+          const chair = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.45, 0.4), toon(0x6c584c));
+          chair.position.set(0, 0.23, dz);
+          set.add(chair);
+        }
+        g.add(set);
+      }
+      break;
+    }
   }
   return g;
 };
@@ -258,6 +368,13 @@ export const poseObstacle = (kind: ObstacleKind, model: THREE.Object3D, knocked:
     });
   } else if (kind === 'barrier') {
     model.rotation.z = knocked ? Math.PI / 2 : 0;
+  } else if (kind === 'terrassa') {
+    model.children.forEach((c, i) => {
+      const k = i % 2 ? 1 : -1;
+      c.rotation.z = knocked ? k * (Math.PI / 2) : 0;
+      c.position.x = knocked ? k * 0.8 : 0;
+      c.position.y = knocked ? 0.3 : 0;
+    });
   }
 };
 

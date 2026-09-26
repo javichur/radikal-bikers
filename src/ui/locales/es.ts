@@ -73,6 +73,9 @@ export const es = {
   'char.nitro.bio': 'El más rápido de la ciudad… si consigue mantener la moto recta.',
   'stage.harborNight.name': 'Puerto Radikal · Noche',
   'stage.harborNight.desc': 'Las mismas calles de noche: más tráfico, más obras y Nitro esperándote en la salida.',
+  'stage.valencia.name': 'València',
+  'stage.valencia.desc':
+    'En plenas Fallas: de la Ciutat de les Arts por el Túria, el Pont de Serrans y las Torres, cruzando Ciutat Vella hasta Colón y la Porta de la Mar.',
   'stage.shortcutsFound': 'Atajos descubiertos',
   'stage.locked': 'Consigue {n} ★ para desbloquear',
   'stage.challenges': 'Retos',
