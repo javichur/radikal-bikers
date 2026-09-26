@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STAGES } from '../../src/content/stages';
+import { NARROW_TAPER } from '../../src/sim/roadWidth';
 import { Track } from '../../src/sim/track';
 
 describe('Track', () => {
@@ -51,11 +52,15 @@ describe('Track', () => {
     expect(() => new Track([[0, 0, 0]])).toThrow();
   });
 
-  it('builds every stage with a sane length and gentle curvature', () => {
+  it('builds every stage with a sane length and gentle curvature (tighter only in slow, narrow old-town streets)', () => {
     for (const s of STAGES) {
       const t = new Track(s.controlPoints);
       expect(t.length).toBeGreaterThan(1500);
-      for (let d = 0; d < t.length; d += 5) expect(Math.abs(t.sample(d).curvature)).toBeLessThan(1 / 40);
+      const narrow = (d: number): boolean =>
+        (s.narrows ?? []).some((n) => d > n.from * t.length - NARROW_TAPER && d < n.to * t.length + NARROW_TAPER);
+      for (let d = 0; d < t.length; d += 5) {
+        expect(Math.abs(t.sample(d).curvature)).toBeLessThan(narrow(d) ? 1 / 18 : 1 / 40);
+      }
     }
   });
 });

@@ -1,6 +1,7 @@
 import { lerp } from '../core/math';
 import type { ShortcutDef } from '../content/stages';
-import { Track } from './track';
+import type { Riverbed } from './scenery';
+import { Track, type ProfileKey } from './track';
 
 /** Half width of the drivable lane of a shortcut (alleys and shops). */
 export const ROUTE_HALF_WIDTH = 5;
@@ -44,34 +45,82 @@ export interface Route {
   readonly panes: GlassPane[];
   /** Route intervals inside a shop (between its front and back windows). */
   readonly shops: readonly Range[];
+  /** Lateral distance from the main road centre to the street front of each shop. */
+  readonly shopFronts: readonly number[];
+  /** Route interval below the streets (ramps included), when it dives into a sunken riverbed. */
+  readonly sunken: Range | null;
 }
 
 type P3 = [number, number, number];
 
+/** Length of the ramps taking a shortcut down into a sunken riverbed and back up. */
+export const RIVERBED_RAMP = 35;
+
+/**
+ * Elevation keys taking a (flat) route down to the floor of the riverbed wherever it crosses it: the ramps start at
+ * the edge of the bed, so the route never dips below the streets. Null if the route stays on the streets.
+ */
+const sunkenStretch = (track: Track, riverbed: Riverbed): { keys: ProfileKey[]; range: Range } | null => {
+  let a = Infinity;
+  let b = -Infinity;
+  for (let s = 0; s <= track.length; s += 1) {
+    const p = track.sample(s);
+    if (!riverbed.sunk(p.x, p.z)) continue;
+    a = Math.min(a, s);
+    b = Math.max(b, s);
+  }
+  if (b - a < RIVERBED_RAMP * 2.5) return null;
+  const L = track.length;
+  const y0 = track.sample(0).y;
+  const y1 = track.sample(L).y;
+  const floor = -riverbed.depth;
+  const keys = [
+    { at: 0, y: y0 },
+    { at: a / L, y: y0 },
+    { at: (a + RIVERBED_RAMP) / L, y: floor },
+    { at: (b - RIVERBED_RAMP) / L, y: floor },
+    { at: b / L, y: y1 },
+    { at: 1, y: y1 },
+  ];
+  return { keys, range: { from: a, to: b } };
+};
+
 const facade = (hw: number): number => hw + SIDEWALK + FACADE_GAP;
 
-/** Builds the geometry of a shortcut from its definition relative to the main road. */
-export const buildRoute = (main: Track, hw: number, def: ShortcutDef, index: number): Route => {
+/**
+ * Builds the geometry of a shortcut from its definition relative to the main road, whose carriageway half width at
+ * each distance is `hwAt` (narrow streets bring the facades, and the back streets behind them, closer).
+ */
+export const buildRoute = (
+  main: Track,
+  hwAt: (s: number) => number,
+  def: ShortcutDef,
+  index: number,
+  riverbed: Riverbed | null = null,
+): Route => {
   const s0 = def.from * main.length;
   const s1 = def.to * main.length;
   const side = def.side;
-  const e = facade(hw);
+  const e = (s: number): number => facade(hwAt(s));
   const at = (s: number, d: number): P3 => {
     const p = main.toWorld(s, side * d);
     return [p.x, p.z, main.heightAt(s)];
   };
-  const a = at(s0 + ALLEY_RUN, e + ALLEY_OFFSET);
-  const b = at(s1 - ALLEY_RUN, e + ALLEY_OFFSET);
+  const a = at(s0 + ALLEY_RUN, e(s0 + ALLEY_RUN) + ALLEY_OFFSET);
+  const b = at(s1 - ALLEY_RUN, e(s1 - ALLEY_RUN) + ALLEY_OFFSET);
   const chord: P3[] = [1, 2, 3].map((k) => [lerp(a[0], b[0], k / 4), lerp(a[1], b[1], k / 4), lerp(a[2], b[2], k / 4)]);
-  const track = new Track([
-    at(s0, hw - 2),
-    at(s0 + MOUTH_RUN, e + SHOP_DEPTH / 2),
+  const points = [
+    at(s0, hwAt(s0) - 2),
+    at(s0 + MOUTH_RUN, e(s0 + MOUTH_RUN) + SHOP_DEPTH / 2),
     a,
     ...chord,
     b,
-    at(s1 - MOUTH_RUN, e + SHOP_DEPTH / 2),
-    at(s1, hw - 2),
-  ]);
+    at(s1 - MOUTH_RUN, e(s1 - MOUTH_RUN) + SHOP_DEPTH / 2),
+    at(s1, hwAt(s1) - 2),
+  ];
+  const flat = new Track(points);
+  const dive = riverbed ? sunkenStretch(flat, riverbed) : null;
+  const track = dive ? new Track(points, 1, dive.keys) : flat;
 
   const toRoute = (s: number, d: number): { s: number; d: number } => {
     const p = main.toWorld(s, side * d);
@@ -82,7 +131,7 @@ export const buildRoute = (main: Track, hw: number, def: ShortcutDef, index: num
   let entryFrom = Infinity;
   let entryTo = -Infinity;
   for (let s = s0 - 10; s <= s0 + 60; s += 0.5) {
-    const r = toRoute(s, hw - 0.6);
+    const r = toRoute(s, hwAt(s) - 0.6);
     if (r.s > 0.5 && r.s < track.length / 2 && Math.abs(r.d) < ROUTE_HALF_WIDTH - 0.6) {
       entryFrom = Math.min(entryFrom, s);
       entryTo = Math.max(entryTo, s);
@@ -95,6 +144,7 @@ export const buildRoute = (main: Track, hw: number, def: ShortcutDef, index: num
     let from = Infinity;
     let to = -Infinity;
     for (let s = sa; s <= sb; s += 0.5) {
+      const hw = hwAt(s);
       for (const d of [hw, hw + SIDEWALK / 2, hw + SIDEWALK]) {
         if (Math.abs(toRoute(s, d).d) < ROUTE_HALF_WIDTH + 0.3) {
           from = Math.min(from, s);
@@ -109,6 +159,7 @@ export const buildRoute = (main: Track, hw: number, def: ShortcutDef, index: num
   // Shop windows: where the route crosses the facade line and the back of the shop.
   const panes: GlassPane[] = [];
   const shops: Range[] = [];
+  const shopFronts: number[] = [];
   if (def.kind === 'shop') {
     const lateral = (s: number): number => {
       const p = track.sample(s);
@@ -122,12 +173,16 @@ export const buildRoute = (main: Track, hw: number, def: ShortcutDef, index: num
       throw new Error(`Shop ${index} does not cross its facade`);
     };
     const half = track.length / 2;
-    const front1 = crossing(0, half, e);
-    const back1 = crossing(0, half, e + SHOP_DEPTH);
-    const back2 = crossing(track.length, half, e + SHOP_DEPTH);
-    const front2 = crossing(track.length, half, e);
+    // Each shop stands behind the facade line of its own end of the shortcut.
+    const e0 = e(s0 + MOUTH_RUN);
+    const e1 = e(s1 - MOUTH_RUN);
+    const front1 = crossing(0, half, e0);
+    const back1 = crossing(0, half, e0 + SHOP_DEPTH);
+    const back2 = crossing(track.length, half, e1 + SHOP_DEPTH);
+    const front2 = crossing(track.length, half, e1);
     for (const s of [front1, back1, back2, front2]) panes.push({ s, broken: false });
     shops.push({ from: front1, to: back1 }, { from: back2, to: front2 });
+    shopFronts.push(e0, e1);
   }
 
   return {
@@ -141,6 +196,8 @@ export const buildRoute = (main: Track, hw: number, def: ShortcutDef, index: num
     mouths,
     panes,
     shops,
+    shopFronts,
+    sunken: dive?.range ?? null,
   };
 };
 

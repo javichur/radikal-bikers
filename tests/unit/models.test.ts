@@ -113,6 +113,20 @@ describe('city builder', () => {
     }
   });
 
+  it('paints the city buses in the livery of each scenery (red EMT buses in València)', () => {
+    const colors = (g: THREE.Object3D): number[] => {
+      const out: number[] = [];
+      g.traverse((o) => {
+        if (o instanceof THREE.Mesh && 'color' in o.material)
+          out.push((o.material as THREE.MeshToonMaterial).color.getHex());
+      });
+      return out;
+    };
+    expect(LOOKS.valencia.bus).toBe(0xd52b1e);
+    expect(colors(buildVehicle('bus', 1, false, 'modern', LOOKS.valencia.bus))).toContain(0xd52b1e);
+    expect(colors(buildVehicle('bus', 1))).not.toContain(0xd52b1e);
+  });
+
   it('builds a detailed vintage tram whose trolley pole reaches the contact wire', () => {
     const g = buildVehicle('tram', 1, false, 'vintage');
     const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());

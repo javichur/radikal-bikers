@@ -377,7 +377,13 @@ export class GameRenderer {
       alive.add(v.id);
       let g = this.vehicles.get(v.id);
       if (!g) {
-        g = buildVehicle(v.kind, v.variant, world.stage.theme.night, LOOKS[world.stage.scenery].tram);
+        g = buildVehicle(
+          v.kind,
+          v.variant,
+          world.stage.theme.night,
+          LOOKS[world.stage.scenery].tram,
+          LOOKS[world.stage.scenery].bus,
+        );
         this.vehicles.set(v.id, g);
         this.scene.add(g);
       }

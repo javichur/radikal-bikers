@@ -108,25 +108,32 @@ coste de luces reales.
 
 **València** (★★★★★, ~3,9 km, 4 carriles, 45 s / +42, +32, +32, +38 s; primera del listado y sin bloqueo): reparto en plenas
 Fallas sobre un trazado sacado de coordenadas reales (lat/lon proyectadas a metros con una escala uniforme de 0,53, así
-se conservan ángulos y proporciones). Las esquinas se han situado de memoria (sin contrastar con OpenStreetMap), con un
-margen de unos 100 m reales:
+se conservan ángulos y proporciones). Las esquinas son posiciones reales del plano:
 
-1. Av. del Professor López Piñero junto a L'Umbracle, L'Hemisfèric y el Museu de les Ciències.
+1. Av. del Professor López Piñero junto a L'Umbracle, L'Hemisfèric y el Museu de les Ciències; esquina de L'Àgora.
 2. Pont de l'Assut de l'Or (puente elevado con su pilón blanco inclinado) sobre los estanques de la Ciutat de les Arts.
-3. Margen norte del Jardí del Túria (0,15–0,65 del recorrido): Palau de les Arts, Passeig de
-   l'Albereda, Palau de la Música, La Peineta, Pont del Real y Museu de Belles Arts.
+3. Margen norte del Jardí del Túria por los puentes de Montolivet, Aragó, l'Exposició, el Real y la Trinitat: Palau de
+   les Arts, Passeig de l'Albereda, Palau de la Música, La Peineta y Museu de Belles Arts.
 4. Pont de Serrans (sobre el cauce seco) y paso bajo las Torres de Serrans (licencia: en realidad el arco es peatonal).
-5. Carrer de Serrans, Plaça de la Mare de Déu (Font del Túria), Plaça de la Reina (Micalet) y Sant Vicent Màrtir.
+5. **Ciutat Vella en calles estrechas** (un carril por sentido sobre adoquín): Carrer de Serrans, Plaça de Manises,
+   Carrer de Cavallers, Plaça del Tossal, Carrer de la Bosseria y Plaça del Mercat (Mercat Central y Llotja). Por ellas
+   solo circula tráfico ligero (sin autobuses, camiones ni tranvía), y la avenida vuelve a su anchura por Maria Cristina.
 6. Plaça de l'Ajuntament con una **falla** en el centro (sólida e indestructible; el tráfico pasa por ambos lados),
    el Ajuntament y Correos.
-7. Carrer de Xàtiva (Estació del Nord y Plaça de Bous) y Carrer de Colón hasta la Porta de la Mar.
+7. Carrer de Xàtiva (Estació del Nord y Plaça de Bous), Carrer de Colón (Mercat de Colón), Porta de la Mar y Plaça de
+   Tetuan.
 
-Tiene 8 atajos: pasarela de L'Umbracle, dos caminos de tierra por el Jardí del Túria, callejones de Penya-roja, Barri
-del Carme hasta la Plaça Redonda (tiendas), carrerons de Sant Francesc, Carrer de Ribera (tiendas) y Poeta Querol
-(tiendas). Los escaparates llevan rótulos locales (MERCAT, ORXATA, FARTONS, FALLES, CERÀMICA). Además: 6 rampas, 5 cajas
-de explosivos en la avenida y 3 en atajos, **terrasses** de bar que se derriban como los conos, conos, 3 obras al azar,
-autobuses, taxis, furgonetas, camiones, tranvía y rival Nitro. Como las curvas del Túria son casi todas a la izquierda,
-la mayoría de los atajos salen por ese lado, y en las rectas del cauce no caben atajos más cortos que la avenida.
+El **Jardí del Túria** es un cauce hundido 5 m bajo las calles (`riverbedDepth`), con muros de piedra: el césped, las
+palmeras, los monumentos del cauce, los estanques y los pilares de los puentes están en el fondo, y los atajos que lo
+cruzan bajan y suben por rampas de piedra de 35 m.
+
+Tiene 9 atajos: pasarela de L'Umbracle, caminos del Túria junto al Palau de les Arts, callejas de Penya-roja (un Consum y
+un forn), el cauce del Túria del Palau de la Música a la Trinitat, Barri del Carme por el Carrer dels Roters (ventalls y
+ceràmica), detrás de Sant Nicolau hasta la Plaça del Mercat (taronges y mercat), Carrer de Ribera (pirotècnia y
+bunyols), el Eixample entre Xàtiva y Colón (una orxateria y un **Mercadona**) y los jardines de la Glorieta y el
+Parterre. Las tiendas llevan rótulos locales (MERCADONA, consum, ORXATERIA, FORN, BUNYOLS, CERÀMICA, PIROTÈCNIA…).
+Además: rampas, cajas de explosivos en la avenida y en atajos, **terrasses** de bar que se derriban como los conos,
+conos, obras al azar, taxis, furgonetas, camiones, tranvía, autobuses **rojos de la EMT** y rival Nitro.
 
 ## HUD
 

@@ -38,12 +38,18 @@ export interface TrafficConfig {
   readonly oncomingSpeedScale?: number;
   /** Lanes closed by roadworks: vehicles don't spawn there and change lane before reaching them. */
   readonly laneClosed?: (s: number, d: number, margin: number) => boolean;
+  /** Restricted stretches closed to heavy vehicles (buses, lorries, trams): only some light ones spawn there. */
+  readonly lightOnly?: (s: number, dir: 1 | -1) => boolean;
 }
 
 /** Distance kept by traffic before a closed level crossing (clear of the jump ramp in front of it). */
 export const CROSSING_STOP_GAP = 14;
 
+/** Default metres ahead of the player where traffic lives. */
+export const TRAFFIC_AHEAD = 340;
 const MIN_SPAWN_GAP = 22;
+/** Longest vehicle allowed where traffic is restricted to light vehicles. */
+const LIGHT_VEHICLE_LENGTH = 6;
 const HONK_DISTANCE = 16;
 const LANE_CHANGE_SPEED = 4;
 const WORKS_LOOKAHEAD = 45;
@@ -62,7 +68,7 @@ export class Traffic {
     private readonly rng: Rng,
   ) {
     this.behind = cfg.behind ?? 90;
-    this.ahead = cfg.ahead ?? 340;
+    this.ahead = cfg.ahead ?? TRAFFIC_AHEAD;
     this.startClearance = cfg.startClearance ?? 70;
     this.mix = cfg.mix ?? DEFAULT_TRAFFIC_MIX;
     this.weightTotal = VEHICLE_KINDS.reduce((a, k) => a + (this.mix[k] ?? 0), 0);
@@ -99,6 +105,10 @@ export class Traffic {
     const blocked = this.vehicles.some((v) => v.d === d && Math.abs(v.s - s) < MIN_SPAWN_GAP);
     if (blocked || this.cfg.laneClosed?.(s, d, MIN_SPAWN_GAP)) return null;
     const def = VEHICLES[this.pickKind()];
+    // Restricted streets: no heavy vehicles, and only residents' light traffic (half as much).
+    if (this.cfg.lightOnly?.(s, oncoming ? -1 : 1) && (def.length > LIGHT_VEHICLE_LENGTH || this.rng.next() < 0.5)) {
+      return null;
+    }
     // Long vehicles (trams) need more room than the fixed spawn gap.
     const clear = (v: Vehicle): boolean => v.d !== d || Math.abs(v.s - s) >= (v.length + def.length) / 2 + 4;
     if (!this.vehicles.every(clear)) return null;

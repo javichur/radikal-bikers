@@ -7,6 +7,7 @@ import { DEFAULT_TRAFFIC_MIX, VEHICLE_KINDS, VEHICLES } from '../../src/content/
 import { BIKE } from '../../src/sim/bike';
 import { BARRIER_OFFSET } from '../../src/sim/crossing';
 import { inPolygon, inRiver, polygonDistance, railOf, riverOf, type River } from '../../src/sim/scenery';
+import { laneFits, NARROW_TAPER } from '../../src/sim/roadWidth';
 import { ROUTE_HALF_WIDTH, SIDEWALK } from '../../src/sim/shortcuts';
 import { Track } from '../../src/sim/track';
 import { World } from '../../src/sim/world';
@@ -72,6 +73,25 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
   const L = w.track.length;
   const hw = stage.roadHalfWidth;
   const edge = hw + 0.5 + SIDEWALK;
+  /** Road edge (outside of the sidewalk) at a distance along the main road: closer in narrow streets. */
+  const edgeAt = (s: number): number => w.halfWidthAt(s) + 0.5 + SIDEWALK;
+
+  it('narrow streets squeeze the road clear of tunnels, bridges and roadworks, and leave a lane each way', () => {
+    for (const n of w.narrows) {
+      const span = { from: n.from - NARROW_TAPER, to: n.to + NARROW_TAPER };
+      expect(n.to).toBeGreaterThan(n.from);
+      expect(n.halfWidth).toBeLessThan(hw);
+      expect(stage.lanes.forward.some((d) => laneFits(d, n.halfWidth))).toBe(true);
+      expect(stage.lanes.oncoming.some((d) => laneFits(d, n.halfWidth))).toBe(true);
+      for (const r of [...stage.tunnels, ...stage.bridges]) {
+        expect(r.to * L < span.from || r.from * L > span.to).toBe(true);
+      }
+      for (const z of stage.roadworks) expect(z.at * L + z.length < span.from || z.at * L > span.to).toBe(true);
+      expect(w.halfWidthAt((n.from + n.to) / 2)).toBe(n.halfWidth);
+      expect(w.halfWidthAt(span.from - 1)).toBe(hw);
+      expect(w.halfWidthAt(span.to + 1)).toBe(hw);
+    }
+  });
 
   it('never runs close to another stretch of itself', () => {
     for (let a = 0; a < L; a += 5) {
@@ -90,7 +110,7 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
       for (let s = 40; s < r.track.length - 40; s += 4) {
         const p = r.track.sample(s);
         const q = w.track.project(p.x, p.z);
-        expect(Math.abs(q.d)).toBeGreaterThan(hw + SIDEWALK + ROUTE_HALF_WIDTH);
+        expect(Math.abs(q.d)).toBeGreaterThan(w.halfWidthAt(q.s) + SIDEWALK + ROUTE_HALF_WIDTH);
       }
     }
     const sorted = [...w.routes].sort((a, b) => a.fromS - b.fromS);
@@ -118,13 +138,15 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
 
   it('pickups, ramps, checkpoints and obstacles lie on the road', () => {
     for (const p of w.pickups) {
-      const half = p.route < 0 ? hw : ROUTE_HALF_WIDTH;
+      const half = p.route < 0 ? w.halfWidthAt(p.s) : ROUTE_HALF_WIDTH;
       expect(Math.abs(p.d)).toBeLessThan(half - BIKE.wallMargin);
       expect(p.s).toBeGreaterThan(0);
       expect(p.s).toBeLessThan(w.trackOf(p.route).length);
     }
-    for (const r of w.ramps) expect(Math.abs(r.d) + r.width / 2).toBeLessThanOrEqual(hw);
-    for (const o of w.obstacles) expect(Math.abs(o.d) + OBSTACLES[o.kind].halfWidth).toBeLessThan(hw);
+    for (const r of w.ramps) expect(Math.abs(r.d) + r.width / 2).toBeLessThanOrEqual(w.halfWidthAt(r.s));
+    for (const o of w.obstacles) {
+      expect(Math.abs(o.d) + OBSTACLES[o.kind].halfWidth).toBeLessThan(w.halfWidthAt(o.s));
+    }
   });
 
   it('obstacles leave every traffic lane free and do not sit on ramps, gates or bonuses', () => {
@@ -210,6 +232,27 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
     }
   });
 
+  it('shortcuts dive to the floor of a sunken riverbed and stay at street level elsewhere', () => {
+    const bed = w.riverbed;
+    for (const r of w.routes) {
+      for (let s = 0; s <= r.track.length; s += 1) {
+        const p = r.track.sample(s);
+        if (!bed || !r.sunken || s < r.sunken.from || s > r.sunken.to) {
+          expect(Math.abs(p.y - w.track.heightAt(r.fromS))).toBeLessThan(0.5);
+        } else {
+          // Below the streets only inside the bed, and on its floor away from the ramps.
+          expect(p.y).toBeLessThanOrEqual(0.01);
+          expect(p.y).toBeGreaterThanOrEqual(-bed.depth - 0.01);
+          if (p.y < -0.5) expect(bed.sunk(p.x, p.z)).toBe(true);
+        }
+      }
+    }
+    if (stage.id === 'valencia') {
+      expect(bed?.depth).toBe(5);
+      expect(w.routes.filter((r) => r.sunken).length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('keeps monuments off the roads (city gates stand over a covered section)', () => {
     for (const m of stage.monuments ?? []) {
       const def = MONUMENTS[m.kind];
@@ -221,7 +264,7 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
       const c = w.track.toWorld(m.at * L, m.d);
       for (let s = 0; s < L; s += 2) {
         const p = w.track.sample(s);
-        expect(Math.hypot(p.x - c.x, p.z - c.z)).toBeGreaterThan(def.radius + edge);
+        expect(Math.hypot(p.x - c.x, p.z - c.z)).toBeGreaterThan(def.radius + edgeAt(s));
       }
       for (const r of w.routes) {
         for (let s = 0; s < r.track.length; s += 2) {

@@ -181,13 +181,15 @@ const vintageTram = (g: THREE.Group, w: number, l: number, h: number, variant: n
 
 /**
  * Stylised traffic vehicle facing +Z, origin at ground centre. At `night` the lamps shine, headlight beams and a red
- * tail glow are drawn on the road and buses and trams show lit windows. `tramStyle` picks the modern or vintage tram.
+ * tail glow are drawn on the road and buses and trams show lit windows. `tramStyle` picks the modern or vintage tram
+ * and `busColor` is the city bus livery.
  */
 export const buildVehicle = (
   kind: VehicleKind,
   variant: number,
   night = false,
   tramStyle: 'modern' | 'vintage' = 'modern',
+  busColor = 0xff9f1c,
 ): THREE.Group => {
   const def = VEHICLES[kind];
   const { width: w, length: l, height: h } = def;
@@ -234,7 +236,7 @@ export const buildVehicle = (
       break;
     case 'bus': {
       const base = 0.4;
-      g.add(part(w, h * 0.85, l, 0xff9f1c, 0, base + h * 0.42, 0));
+      g.add(part(w, h * 0.85, l, busColor, 0, base + h * 0.42, 0));
       g.add(part(w + 0.02, h * 0.28, l * 0.92, cabin, 0, base + h * 0.58, 0));
       // Big front windscreen with destination sign, and a rear window.
       g.add(pane(w * 0.9, h * 0.42, base + h * 0.5, l / 2, 1, cabin));

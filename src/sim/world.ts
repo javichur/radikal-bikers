@@ -30,9 +30,11 @@ import {
 } from './race';
 import { createRival, stepRival, type RivalState } from './rival';
 import { buildCones, CONE_RADIUS, laneClosed, pickWorkZones, type Cone, type WorkZone } from './roadworks';
+import { halfWidthAt, laneFits, narrowClosures, narrowsOf, reachesNarrow, type Narrow } from './roadWidth';
 import { buildRoute, ROUTE_HALF_WIDTH, routeToMainS, type Route } from './shortcuts';
+import { riverbedOf, riverOf, type Riverbed } from './scenery';
 import { Track } from './track';
-import { overlaps, Traffic, type Box, type Vehicle } from './traffic';
+import { overlaps, Traffic, TRAFFIC_AHEAD, type Box, type Vehicle } from './traffic';
 
 export interface Ramp {
   readonly s: number;
@@ -117,6 +119,12 @@ export class World {
   readonly obstacles: readonly ObstacleState[];
   readonly crossings: readonly Crossing[];
   readonly zones: readonly WorkZone[];
+  /** Narrow streets of the main road. */
+  readonly narrows: readonly Narrow[];
+  /** Sunken riverbed holding the parks and rivers (null when the stage is flat). */
+  readonly riverbed: Riverbed | null;
+  /** Lanes closed to traffic: roadworks plus the outer lanes of narrow streets. */
+  readonly closures: readonly WorkZone[];
   readonly cones: readonly Cone[];
   readonly rival: RivalState | null;
   bike: BikeState;
@@ -151,7 +159,17 @@ export class World {
     this.track = new Track(stage.controlPoints, 1, stage.profile);
     this.rules = rulesFromStage(stage, this.track.length);
     this.ramps = stage.ramps.map((r) => ({ s: r.at * this.track.length, d: r.d, width: r.width }));
-    this.routes = stage.shortcuts.map((def, i) => buildRoute(this.track, stage.roadHalfWidth, def, i));
+    this.narrows = narrowsOf(stage, this.track.length);
+    this.riverbed = stage.riverbedDepth
+      ? riverbedOf(
+          stage.riverbedDepth,
+          stage.parks ?? [],
+          stage.bridges.map((b) => riverOf(this.track, b)),
+        )
+      : null;
+    this.routes = stage.shortcuts.map((def, i) =>
+      buildRoute(this.track, (s) => this.halfWidthAt(s), def, i, this.riverbed),
+    );
     this.pickups = stage.pickups.map((p) => ({
       kind: p.kind ?? 'explosive',
       route: p.route,
@@ -171,6 +189,7 @@ export class World {
       offset: c.offset,
     }));
     this.zones = pickWorkZones(stage, this.track.length, seed);
+    this.closures = [...this.zones, ...narrowClosures(this.narrows, [...stage.lanes.forward, ...stage.lanes.oncoming])];
     this.cones = buildCones(this.zones);
     this.bike = createBike(5, stage.lanes.forward[0] ?? 0);
     this.race = createRace(this.rules);
@@ -187,7 +206,8 @@ export class World {
         density: stage.trafficDensity,
         mix: stage.trafficMix,
         oncomingSpeedScale: stage.oncomingSpeedScale,
-        laneClosed: (s, d, margin) => laneClosed(this.zones, s, d, margin),
+        laneClosed: (s, d, margin) => laneClosed(this.closures, s, d, margin),
+        lightOnly: this.narrows.length ? (s, dir) => reachesNarrow(this.narrows, s, dir, TRAFFIC_AHEAD) : undefined,
       },
       new Rng(seed),
     );
@@ -267,7 +287,8 @@ export class World {
           stage: this.stage,
           ramps: this.ramps,
           vehicles: this.traffic.vehicles,
-          zones: this.zones,
+          zones: this.closures,
+          roadHalfWidth: (s) => this.halfWidthAt(s),
           finishS: this.rules.finishS,
           playerS: this.mainS,
           elapsed: this.race.elapsed,
@@ -404,7 +425,12 @@ export class World {
   }
 
   private get roadHalfWidth(): number {
-    return this.bike.route < 0 ? this.stage.roadHalfWidth : ROUTE_HALF_WIDTH;
+    return this.bike.route < 0 ? this.halfWidthAt(this.bike.s) : ROUTE_HALF_WIDTH;
+  }
+
+  /** Half width of the main carriageway at distance `s` (narrower in narrow streets). */
+  halfWidthAt(s: number): number {
+    return halfWidthAt(this.stage.roadHalfWidth, this.narrows, s);
   }
 
   /** Main-road distance equivalent to the bike position (race progress, checkpoints, traffic window). */
@@ -451,7 +477,7 @@ export class World {
   private updateRoutes(prevS: number, events: SimEvent[]): void {
     const b = this.bike;
     if (b.route < 0) {
-      const limit = this.stage.roadHalfWidth - BIKE.wallMargin;
+      const limit = this.halfWidthAt(b.s) - BIKE.wallMargin;
       const r = this.routes.find((x) => b.s >= x.entry.from && b.s <= x.entry.to && x.side * b.d > limit);
       if (!r) return;
       const w = this.track.toWorld(b.s, b.d);
@@ -473,14 +499,14 @@ export class World {
     if (!nearEnds) return;
     const w = r.track.toWorld(b.s, b.d);
     const p = this.track.project(w.x, w.z, this.mainS, 90);
-    const inside = r.side * p.d < this.stage.roadHalfWidth - 1;
+    const inside = r.side * p.d < this.halfWidthAt(p.s) - 1;
     if (inside || b.s >= L || b.s <= 0) this.moveTo(-1, this.track, p.s, p.d, w.heading);
   }
 
   private moveTo(route: number, track: Track, s: number, d: number, oldHeading: number): void {
     const b = this.bike;
     const h = track.sample(s).heading;
-    const hw = (route < 0 ? this.stage.roadHalfWidth : ROUTE_HALF_WIDTH) - BIKE.wallMargin;
+    const hw = (route < 0 ? this.halfWidthAt(s) : ROUTE_HALF_WIDTH) - BIKE.wallMargin;
     b.route = route;
     b.s = s;
     b.d = Math.max(-hw, Math.min(hw, d));
@@ -652,11 +678,11 @@ export class World {
   private resolveCrossings(states: readonly CrossingState[], events: SimEvent[]): void {
     const b = this.bike;
     if (b.crashTimer > 0 || b.invulnerable > 0) return;
-    const hw = this.stage.roadHalfWidth;
     for (let i = 0; i < states.length; i++) {
       const st = states[i]!;
       if (!st.closed) continue;
       const c = this.crossings[i]!;
+      const hw = this.halfWidthAt(c.s);
       if (trainOnRoad(st, hw) && b.height < TRAIN_HEIGHT) {
         const train = { s: c.s, d: 0, halfLength: RAIL_HALF_WIDTH, halfWidth: hw + 1 };
         if (overlaps(this.bikeBox, train)) {
@@ -684,7 +710,8 @@ export class World {
       const near = b.s > c.s - BARRIER_OFFSET - 1 && b.s < c.s + BARRIER_OFFSET + 1;
       if (near && this.crossingAt(i).closed) b.s = c.s - BARRIER_OFFSET - 3;
     });
-    const lanes = [...this.stage.lanes.forward, ...this.stage.lanes.oncoming];
+    const hw = this.halfWidthAt(b.s);
+    const lanes = [...this.stage.lanes.forward, ...this.stage.lanes.oncoming].filter((d) => laneFits(d, hw));
     const isFree = (d: number): boolean =>
       !this.traffic.vehicles.some((v: Vehicle) => Math.abs(v.d - d) < 2.5 && Math.abs(v.s - b.s) < 25);
     const byDistance = [...lanes].sort((x, y) => Math.abs(x - b.d) - Math.abs(y - b.d));

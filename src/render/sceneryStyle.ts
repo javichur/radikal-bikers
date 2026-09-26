@@ -44,6 +44,8 @@ export interface SceneryLook {
   readonly tram: 'modern' | 'vintage';
   /** Overhead contact wires, poles and span wires above the tram lanes. */
   readonly catenary: boolean;
+  /** Livery of the city buses. */
+  readonly bus: number;
 }
 
 const CITY: SceneryLook = {
@@ -66,6 +68,7 @@ const CITY: SceneryLook = {
   containers: false,
   tram: 'modern',
   catenary: false,
+  bus: 0xff9f1c,
 };
 
 export const LOOKS: Readonly<Record<SceneryStyle, SceneryLook>> = {
@@ -133,6 +136,8 @@ export const LOOKS: Readonly<Record<SceneryStyle, SceneryLook>> = {
     propChance: 0.65,
     treeChance: 0.6,
     tunnel: 'arcade',
+    // EMT València red.
+    bus: 0xd52b1e,
   },
 };
 

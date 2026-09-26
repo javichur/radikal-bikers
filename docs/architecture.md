@@ -44,7 +44,11 @@ src/
   monumentos (`monuments`, tipos de `content/monuments.ts` dibujados en `render/monuments.ts`, que apartan los
   edificios procedurales). El estilo `valencia` añade manzanas continuas del Ensanche, tejados de teja azul vidriada y
   naranjos. `tests/unit/stages.test.ts` valida el trazado de cada recorrido, que los parques solo se crucen por puentes
-  y que los monumentos no pisen calzadas ni atajos.
+  y que los monumentos no pisen calzadas ni atajos. `narrows` estrecha tramos de la avenida (`sim/roadWidth.ts`: la
+  ciudad sigue el ancho de la calzada y solo pasa el tráfico que cabe en los carriles abiertos) y `riverbedDepth` hunde
+  parques y ríos en un cauce (`sim/scenery.ts` `riverbedOf`): los atajos que lo cruzan reciben un perfil con rampas
+  (`Route.sunken`) y `render/riverbed.ts` dibuja el suelo con un hueco relleno por una malla hundida. `LOOKS` en
+  `render/sceneryStyle.ts` fija por estilo detalles como el color de los autobuses (`bus`, rojo EMT en València).
 
 ## Física (resumen)
 

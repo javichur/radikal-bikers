@@ -46,7 +46,10 @@ export interface RivalEnv {
   readonly stage: StageDef;
   readonly ramps: readonly Ramp[];
   readonly vehicles: readonly Vehicle[];
+  /** Lanes closed to traffic (roadworks and narrow streets). */
   readonly zones: readonly WorkZone[];
+  /** Half width of the carriageway at a distance along the road. */
+  readonly roadHalfWidth: (s: number) => number;
   readonly finishS: number;
   readonly playerS: number;
   readonly elapsed: number;
@@ -83,14 +86,7 @@ export const stepRival = (r: RivalState, env: RivalEnv, running: boolean, dt: nu
       ? { ...drive(r, env), brake: 0, wheelie: false }
       : { steer: 0, throttle: 0, brake: r.finished ? 1 : 0, wheelie: false };
   const p = env.track.sample(b.s);
-  stepBike(
-    b,
-    input,
-    stats,
-    { curvature: p.curvature, roadHalfWidth: env.stage.roadHalfWidth, slope: p.slope },
-    dt,
-    own,
-  );
+  stepBike(b, input, stats, { curvature: p.curvature, roadHalfWidth: env.roadHalfWidth(b.s), slope: p.slope }, dt, own);
   for (const ramp of env.ramps) {
     if (prevS < ramp.s && b.s >= ramp.s && Math.abs(b.d - ramp.d) < ramp.width / 2) launchBike(b, own);
   }

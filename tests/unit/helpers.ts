@@ -2,6 +2,7 @@ import { FIXED_DT } from '../../src/core/loop';
 import type { ControlState } from '../../src/input/types';
 import { OBSTACLES } from '../../src/content/obstacles';
 import { trainOnRoad } from '../../src/sim/crossing';
+import { laneFits } from '../../src/sim/roadWidth';
 import type { SimEvent } from '../../src/sim/events';
 import type { World } from '../../src/sim/world';
 
@@ -27,8 +28,12 @@ const trainComing = (world: World, i: number, seconds: number): boolean => {
  */
 export const autopilot = (world: World, targetD: number): ControlState => {
   const b = world.bike;
-  let d = targetD;
-  const lanes = [...world.stage.lanes.forward, ...world.stage.lanes.oncoming];
+  // Only the lanes that fit here and a bit ahead (narrow streets close the outer ones).
+  const hw = Math.min(world.halfWidthAt(b.s), world.halfWidthAt(b.s + 30));
+  const lanes = [...world.stage.lanes.forward, ...world.stage.lanes.oncoming].filter((l) => laneFits(l, hw));
+  let d = laneFits(targetD, hw)
+    ? targetD
+    : lanes.reduce((a, l) => (Math.abs(l - targetD) < Math.abs(a - targetD) ? l : a));
   const blockers = [
     ...world.traffic.vehicles.map((v) => ({ s: v.s, d: v.d, halfWidth: 1 })),
     ...world.obstacles
