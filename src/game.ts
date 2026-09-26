@@ -4,6 +4,7 @@ import { STAGES } from './content/stages';
 import { GameFlow, type FlowEffect, type Screen } from './core/gameFlow';
 import { FIXED_DT, FixedStepper } from './core/loop';
 import { SaveData } from './core/storage';
+import { fetchDeployedVersion, UpdateChecker } from './core/updateCheck';
 import { GamepadInput } from './input/gamepad';
 import { KeyboardInput } from './input/keyboard';
 import { isTouchDevice, TouchInput } from './input/touch';
@@ -35,6 +36,7 @@ export class Game {
   private result: ResultInfo | null = null;
   private lastFrame = 0;
   private lastCountdownShown = -1;
+  private updates: UpdateChecker | null = null;
 
   constructor(private readonly root: HTMLElement) {
     this.i18n = new I18n(this.save.settings.locale ?? detectLocale(navigator.languages ?? [navigator.language]));
@@ -61,7 +63,22 @@ export class Game {
     window.addEventListener('pointerdown', () => this.audio.unlock(), { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.flow.screen === 'racing') this.onMenu('pause');
+      if (!document.hidden) void this.updates?.check();
     });
+
+    if (!import.meta.env.DEV && !params.has('e2e')) {
+      this.updates = new UpdateChecker({
+        current: __APP_VERSION__,
+        fetchVersion: () => fetchDeployedVersion(document.baseURI),
+        getScreen: () => this.flow.screen,
+        reload: () => location.reload(),
+        storage: safeSessionStorage(),
+      });
+      window.addEventListener('pageshow', (e) => {
+        if (e.persisted) void this.updates?.check();
+      });
+      void this.updates.check();
+    }
 
     this.flow.onChange((s) => this.onScreen(s));
     this.onScreen(this.flow.screen);
@@ -125,6 +142,7 @@ export class Game {
   }
 
   private onScreen(s: Screen): void {
+    this.updates?.onScreen(s);
     if (s === 'characterSelect') {
       const c = CHARACTERS[this.flow.characterIndex]!;
       if (this.world.character.id !== c.id) {
@@ -277,6 +295,14 @@ export class Game {
 const safeLocalStorage = (): Storage | null => {
   try {
     return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+const safeSessionStorage = (): Storage | null => {
+  try {
+    return window.sessionStorage;
   } catch {
     return null;
   }
