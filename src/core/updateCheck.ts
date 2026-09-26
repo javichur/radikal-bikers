@@ -49,8 +49,10 @@ export class UpdateChecker {
   /** Call on every screen change; reloads once a pending update is safe to apply. */
   onScreen(screen: Screen): void {
     if (this.pending === null || !SAFE_RELOAD_SCREENS.includes(screen)) return;
+    const pending = this.pending;
+    this.pending = null;
     try {
-      this.opts.storage?.setItem(RELOADED_KEY, this.pending);
+      this.opts.storage?.setItem(RELOADED_KEY, pending);
     } catch {
       // Storage may be unavailable (private mode); reload anyway.
     }

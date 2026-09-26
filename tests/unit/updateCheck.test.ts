@@ -46,6 +46,15 @@ describe('UpdateChecker', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it('clears a pending update once reload is requested', async () => {
+    const { checker, reload } = setup('v2', 'racing');
+    await checker.check();
+    checker.onScreen('title');
+    checker.onScreen('stageSelect');
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(checker.updatePending).toBe(false);
+  });
+
   it('does not reload twice for the same version (stale page guard)', async () => {
     const first = setup('v2');
     await first.checker.check();
