@@ -6,7 +6,19 @@ import type { StageDef } from '../content/stages';
 import { VEHICLES } from '../content/vehicles';
 import type { ControlState } from '../input/types';
 import { wrapAngle } from '../core/math';
-import { BIKE, canHop, crashBike, hopBike, createBike, landBike, launchBike, stepBike, type BikeState } from './bike';
+import {
+  BIKE,
+  canHop,
+  crashBike,
+  createBike,
+  facingBackwards,
+  hopBike,
+  landBike,
+  launchBike,
+  scaleYaw,
+  stepBike,
+  type BikeState,
+} from './bike';
 import {
   BARRIER_HEIGHT,
   BARRIER_OFFSET,
@@ -107,6 +119,8 @@ export interface RunStats {
 }
 /** Speed kept after smashing through a shop window. */
 const GLASS_SPEED_KEEP = 0.85;
+/** Seconds facing against the course before the wrong-way warning shows up. */
+export const WRONG_WAY_DELAY = 0.5;
 
 /** The whole deterministic game simulation for one race. */
 export class World {
@@ -150,6 +164,8 @@ export class World {
   time = 0;
   /** Vertical speed of the road under the grounded bike (detects crests). */
   private roadVy = 0;
+  /** Seconds the rider has been facing against the course. */
+  private wrongWayTime = 0;
 
   constructor(
     readonly stage: StageDef,
@@ -249,6 +265,8 @@ export class World {
       events,
     );
     this.followRoad(track, prevY, airRoadVy, dt, events);
+    const wrongWay = raceRunning && !finished && b.crashTimer <= 0 && facingBackwards(b.yaw);
+    this.wrongWayTime = wrongWay ? this.wrongWayTime + dt : 0;
 
     if (b.route < 0) {
       for (const r of this.ramps) {
@@ -510,7 +528,7 @@ export class World {
     b.route = route;
     b.s = s;
     b.d = Math.max(-hw, Math.min(hw, d));
-    b.yaw = Math.max(-BIKE.maxYaw, Math.min(BIKE.maxYaw, b.yaw + wrapAngle(h - oldHeading)));
+    b.yaw = wrapAngle(b.yaw + wrapAngle(h - oldHeading));
   }
 
   private updatePickups(dt: number, events: SimEvent[]): void {
@@ -553,7 +571,7 @@ export class World {
         return true;
       }
       b.d = o.d + sideD * (o.halfWidth + bikeBox.halfWidth + 0.05);
-      if (lateral > 0) b.yaw *= -0.3;
+      if (lateral > 0) b.yaw = scaleYaw(-b.yaw, 0.3);
       b.speed *= 0.97;
       events.push({ type: 'scrape' });
       return false;
@@ -564,7 +582,7 @@ export class World {
       return true;
     }
     // Gentle rear-end nudge: match speed and back off.
-    b.speed = Math.max(0, speed);
+    b.speed = Math.max(0, speed * Math.sign(Math.cos(b.yaw)));
     b.s = o.s - sideS * (o.halfLength + bikeBox.halfLength + 0.05);
     events.push({ type: 'scrape' });
     return false;
@@ -625,7 +643,7 @@ export class World {
         }
         this.touched.add(v.id);
         b.d = v.d + sideD * (vBox.halfWidth + bikeBox.halfWidth + 0.05);
-        if (lateral > 0) b.yaw *= -0.3;
+        if (lateral > 0) b.yaw = scaleYaw(-b.yaw, 0.3);
         b.speed *= 0.97;
         events.push({ type: 'scrape' });
         continue;
@@ -643,7 +661,7 @@ export class World {
       }
       // Gentle rear-end nudge: match speed and back off.
       this.touched.add(v.id);
-      b.speed = Math.max(0, v.speed * v.dir);
+      b.speed = Math.max(0, v.speed * v.dir * Math.sign(Math.cos(b.yaw)));
       b.s = v.s - sideS * (vBox.halfLength + bikeBox.halfLength + 0.05);
       events.push({ type: 'scrape' });
     }
@@ -725,6 +743,7 @@ export class World {
     b.invulnerable = BIKE.invulnerableDuration;
     this.bike = b;
     this.roadVy = 0;
+    this.wrongWayTime = 0;
     this.traffic.vehicles.length = 0;
     this.traffic.populate(b.s);
     this.wheelieRun = 0;
@@ -740,6 +759,11 @@ export class World {
   /** Rival distance ahead of the player (negative = behind), or null without a rival. */
   get rivalGap(): number | null {
     return this.rival ? this.rival.bike.s - this.mainS : null;
+  }
+
+  /** True once the rider has been riding against the course for a moment (the HUD tells him to turn round). */
+  get wrongWay(): boolean {
+    return this.wrongWayTime >= WRONG_WAY_DELAY;
   }
 
   get progress(): number {

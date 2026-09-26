@@ -1,4 +1,4 @@
-import { approach, clamp } from '../core/math';
+import { approach, clamp, wrapAngle } from '../core/math';
 import type { CharacterStats } from '../content/characters';
 import type { ControlState } from '../input/types';
 import type { SimEvent } from './events';
@@ -17,6 +17,7 @@ export const BIKE = {
   wheelieSteerFactor: 0.45,
   wheelieMaxTime: 3,
   wheelieCooldown: 1.5,
+  /** Largest heading offset the chase camera treats as a normal lean (beyond it the camera swings round). */
   maxYaw: 1.1,
   selfAlign: 0.25,
   wallMargin: 0.6,
@@ -100,6 +101,16 @@ export const createBike = (s = 0, d = 3): BikeState => ({
 
 export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
 
+/** True when the bike points against the course (it has turned round). */
+export const facingBackwards = (yaw: number): boolean => Math.abs(wrapAngle(yaw)) > Math.PI / 2;
+
+/** Offset of the heading from the nearest road direction (forwards or backwards), in (-PI/2, PI/2]. */
+export const axisYaw = (yaw: number): number => (facingBackwards(yaw) ? wrapAngle(yaw - Math.PI) : wrapAngle(yaw));
+
+/** Scales the offset from the nearest road direction by `k`, keeping the bike facing the same way. */
+export const scaleYaw = (yaw: number, k: number): number =>
+  facingBackwards(yaw) ? wrapAngle(Math.PI + wrapAngle(yaw - Math.PI) * k) : wrapAngle(yaw) * k;
+
 export const effectiveTopSpeed = (b: BikeState, stats: CharacterStats): number =>
   b.turbo > 0 ? BIKE.turboSpeed : stats.topSpeed * (b.wheelie > 0.5 ? BIKE.wheelieBoost : 1);
 
@@ -157,7 +168,7 @@ export const landBike = (b: BikeState, events: SimEvent[]): void => {
   b.vy = 0;
   b.airborne = false;
   events.push({ type: 'land' });
-  if (Math.abs(b.yaw) > BIKE.landingCrashYaw) crashBike(b, 'landing', events);
+  if (Math.abs(axisYaw(b.yaw)) > BIKE.landingCrashYaw) crashBike(b, 'landing', events);
 };
 
 export interface BikeEnv {
@@ -256,12 +267,17 @@ export const stepBike = (
   if (b.airborne) steerFactor *= 0.2;
   const steer = input.steer * Math.sign(b.speed || 1);
   b.yaw += steer * stats.handling * speedFactor * steerFactor * dt;
-  if (input.steer === 0 && !b.airborne) b.yaw = approach(b.yaw, 0, BIKE.selfAlign * speedFactor * dt);
+  if (input.steer === 0 && !b.airborne) {
+    // Straighten up along the road, whichever way the bike is facing.
+    const along = facingBackwards(b.yaw) ? Math.sign(b.yaw) * Math.PI : 0;
+    b.yaw = approach(b.yaw, along, BIKE.selfAlign * speedFactor * dt);
+  }
 
   // Road curvature rotates the road under the bike.
   const ds = b.speed * Math.cos(b.yaw) * dt;
   b.yaw += env.curvature * ds;
-  b.yaw = clamp(b.yaw, -BIKE.maxYaw, BIKE.maxYaw);
+  // No clamp: the rider may turn fully round and ride against the course.
+  b.yaw = wrapAngle(b.yaw);
   b.lean = approach(b.lean, input.steer * speedFactor, 4 * dt);
 
   // --- Integrate position ----------------------------------------------
@@ -284,10 +300,10 @@ export const stepBike = (
     if (lateral > BIKE.wallCrashLateralSpeed) {
       // Hard hit: bounce off and lose some speed, but stay on the bike.
       b.speed *= BIKE.wallBumpSpeedKeep;
-      b.yaw *= -0.2;
+      b.yaw = scaleYaw(-b.yaw, 0.2);
     } else {
       b.speed = Math.max(0, b.speed - (BIKE.wallScrapeDecel / stats.weight) * dt);
-      if (b.yaw * side > 0) b.yaw *= 0.5;
+      if (Math.sin(b.yaw) * side > 0) b.yaw = scaleYaw(b.yaw, 0.5);
     }
     events.push({ type: 'scrape' });
   }

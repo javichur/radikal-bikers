@@ -47,6 +47,8 @@ export const en: Record<MessageKey, string> = {
   'hud.hurry': 'HURRY UP!',
   'hud.go': 'GO!',
   'hud.crash': 'WIPEOUT!',
+  'hud.wrongWay': 'WRONG WAY!',
+  'hud.turnAround': 'Turn around',
   'hud.wheelie': 'WHEELIE!',
   'hud.jump': 'JUMP!',
   'hud.explosive': 'EXPLOSIVES!',
