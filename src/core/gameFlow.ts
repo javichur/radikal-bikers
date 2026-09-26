@@ -129,7 +129,7 @@ export class GameFlow {
           this.startCountdown();
           return { type: 'continueRace' };
         }
-        if (action === 'back') this.showResult('gameOver');
+        if (action === 'back' || action === 'pause') this.showResult('gameOver');
         return null;
       case 'gameOver':
       case 'finished':

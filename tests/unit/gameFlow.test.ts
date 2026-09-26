@@ -171,6 +171,14 @@ describe('GameFlow', () => {
     expect(f.screen).toBe('gameOver');
   });
 
+  it('pause (Escape) also declines to continue', () => {
+    const f = flow();
+    toRacing(f);
+    f.notifyTimeUp();
+    f.handle('pause');
+    expect(f.screen).toBe('gameOver');
+  });
+
   it('finishing shows results; notifications are ignored outside a race', () => {
     const f = flow();
     f.notifyFinished();
