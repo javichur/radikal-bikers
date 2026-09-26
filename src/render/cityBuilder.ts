@@ -216,7 +216,7 @@ export const buildCity = (world: World): CityScene => {
   for (const mon of stage.monuments ?? []) {
     const p = track.toWorld(mon.at * L, mon.d);
     const g = monumentModel(mon.kind);
-    g.position.set(p.x, mon.d === 0 ? p.y : -0.05, p.z);
+    g.position.set(p.x, p.y + (mon.d === 0 ? 0 : -0.05), p.z);
     g.rotation.y = p.heading + Math.sign(mon.d) * (Math.PI / 2);
     root.add(g);
     obstacles.push({ x: p.x, z: p.z, r: MONUMENTS[mon.kind].radius });
