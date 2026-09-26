@@ -13,22 +13,30 @@ export type Screen =
 
 export const COUNTDOWN_SECONDS = 3;
 export const CONTINUE_SECONDS = 9;
+/** Results ignore input for a moment so a late button press doesn't skip them. */
+export const RESULT_LOCK_SECONDS = 1;
 
 export type FlowEffect =
   | { readonly type: 'startRace' }
   | { readonly type: 'continueRace' }
   | { readonly type: 'quitRace' }
-  | { readonly type: 'restartRace' };
+  | { readonly type: 'restartRace' }
+  /** Tried to confirm a rider or stage that isn't unlocked yet. */
+  | { readonly type: 'locked' }
+  /** Change the paint of the highlighted rider. */
+  | { readonly type: 'cyclePaint'; readonly dir: 1 | -1 };
 
 export interface FlowOptions {
   readonly characterCount: number;
   readonly stageCount: number;
+  readonly isLocked?: (kind: 'character' | 'stage', index: number) => boolean;
 }
 
 /**
  * UI-agnostic arcade flow:
  * title → character → stage → countdown → racing ⇄ paused
  * racing → continue (time up) → countdown | gameOver ; racing → finished
+ * gameOver | finished → countdown (play again) | title ; 'restart' restarts instantly from any race screen
  */
 export class GameFlow {
   screen: Screen = 'title';
@@ -37,6 +45,7 @@ export class GameFlow {
   pauseIndex = 0;
   countdown = 0;
   continueTimer = 0;
+  resultLock = 0;
   private readonly listeners = new Set<(s: Screen) => void>();
 
   constructor(private readonly opts: FlowOptions) {}
@@ -53,19 +62,35 @@ export class GameFlow {
 
   static readonly PAUSE_ITEMS = ['resume', 'restart', 'quit'] as const;
 
+  private locked(kind: 'character' | 'stage', i: number): boolean {
+    return this.opts.isLocked?.(kind, i) ?? false;
+  }
+
+  private restart(): FlowEffect {
+    this.startCountdown();
+    return { type: 'restartRace' };
+  }
+
   handle(action: MenuAction): FlowEffect | null {
     const wrap = (i: number, n: number): number => ((i % n) + n) % n;
+    if (action === 'restart') {
+      const inRace: readonly Screen[] = ['countdown', 'racing', 'paused', 'continue', 'gameOver', 'finished'];
+      return inRace.includes(this.screen) ? this.restart() : null;
+    }
     switch (this.screen) {
       case 'title':
         if (action === 'confirm') this.go('characterSelect');
         return null;
       case 'characterSelect':
-        if (action === 'left' || action === 'up')
-          this.characterIndex = wrap(this.characterIndex - 1, this.opts.characterCount);
-        else if (action === 'right' || action === 'down')
-          this.characterIndex = wrap(this.characterIndex + 1, this.opts.characterCount);
-        else if (action === 'confirm') this.go('stageSelect');
-        else if (action === 'back' || action === 'pause') this.go('title');
+        if (action === 'left') this.characterIndex = wrap(this.characterIndex - 1, this.opts.characterCount);
+        else if (action === 'right') this.characterIndex = wrap(this.characterIndex + 1, this.opts.characterCount);
+        else if (action === 'up' || action === 'down') {
+          if (this.locked('character', this.characterIndex)) return null;
+          return { type: 'cyclePaint', dir: action === 'up' ? -1 : 1 };
+        } else if (action === 'confirm') {
+          if (this.locked('character', this.characterIndex)) return { type: 'locked' };
+          this.go('stageSelect');
+        } else if (action === 'back' || action === 'pause') this.go('title');
         this.go(this.screen);
         return null;
       case 'stageSelect':
@@ -74,6 +99,7 @@ export class GameFlow {
           this.stageIndex = wrap(this.stageIndex + 1, this.opts.stageCount);
         else if (action === 'back' || action === 'pause') this.go('characterSelect');
         else if (action === 'confirm') {
+          if (this.locked('stage', this.stageIndex)) return { type: 'locked' };
           this.startCountdown();
           return { type: 'startRace' };
         }
@@ -103,13 +129,13 @@ export class GameFlow {
           this.startCountdown();
           return { type: 'continueRace' };
         }
-        if (action === 'back') {
-          this.go('gameOver');
-        }
+        if (action === 'back') this.showResult('gameOver');
         return null;
       case 'gameOver':
       case 'finished':
-        if (action === 'confirm' || action === 'back') {
+        if (this.resultLock > 0) return null;
+        if (action === 'confirm') return this.restart();
+        if (action === 'back' || action === 'pause') {
           this.go('title');
           return { type: 'quitRace' };
         }
@@ -125,10 +151,7 @@ export class GameFlow {
       this.go(this.resumeTo);
       return null;
     }
-    if (item === 'restart') {
-      this.startCountdown();
-      return { type: 'restartRace' };
-    }
+    if (item === 'restart') return this.restart();
     this.go('title');
     return { type: 'quitRace' };
   }
@@ -155,8 +178,17 @@ export class GameFlow {
     this.go('countdown');
   }
 
+  /** Results screen button: play again or back to the title. */
+  selectResult(item: 'again' | 'menu'): FlowEffect | null {
+    if (this.screen !== 'gameOver' && this.screen !== 'finished') return null;
+    if (item === 'again') return this.restart();
+    this.go('title');
+    return { type: 'quitRace' };
+  }
+
   /** Time-driven transitions. */
   update(dt: number): FlowEffect | null {
+    this.resultLock = Math.max(0, this.resultLock - dt);
     if (this.screen === 'countdown') {
       this.countdown -= dt;
       if (this.countdown <= 0) {
@@ -168,7 +200,7 @@ export class GameFlow {
       this.continueTimer -= dt;
       if (this.continueTimer <= 0) {
         this.continueTimer = 0;
-        this.go('gameOver');
+        this.showResult('gameOver');
       } else if (Math.ceil(this.continueTimer) !== before) this.go('continue');
     }
     return null;
@@ -182,7 +214,12 @@ export class GameFlow {
 
   notifyFinished(): void {
     if (this.screen !== 'racing') return;
-    this.go('finished');
+    this.showResult('finished');
+  }
+
+  private showResult(s: 'gameOver' | 'finished'): void {
+    this.resultLock = RESULT_LOCK_SECONDS;
+    this.go(s);
   }
 
   get simulationRunning(): boolean {

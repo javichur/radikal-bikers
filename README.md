@@ -15,6 +15,12 @@ furgonetas, autobuses y camiones (en ambos sentidos), usa las rampas para saltar
 **caballitos** para ganar velocidad punta (a costa de maniobrabilidad) y saltar por encima de los vehículos que se crucen. Si se acaba el tiempo tienes 9 segundos para
 **continuar** desde el último checkpoint (con penalización de puntos).
 
+Encadena **trucos** (pasar a un pelo de un coche, caballitos largos, saltos, cristales, atajos, explosiones) para subir
+el **multiplicador de combo** hasta ×5; si te caes, lo pierdes. Cada recorrido tiene 3 **retos** (⭐) y una nota
+**S/A/B/C**; las estrellas desbloquean al repartidor **Nitro** y el recorrido nocturno. Compites contra un **rival** y
+contra el **fantasma** de tu mejor entrega, ganas **XP** para subir de nivel y desbloquear pinturas para la moto, y
+puedes **reiniciar al instante** en cualquier momento.
+
 | Acción         | Teclado         | Mando                | Táctil (iPhone / Android)             |
 | -------------- | --------------- | -------------------- | ------------------------------------- |
 | Girar          | ← → / A D       | Stick izq. / cruceta | Joystick flotante (mitad izquierda)   |
@@ -22,6 +28,7 @@ furgonetas, autobuses y camiones (en ambos sentidos), usa las rampas para saltar
 | Frenar / atrás | ↓ / S           | LT / X               | Botón **FRENO**                       |
 | Caballito      | Espacio / Shift | RB / Y               | Botón **CABALLITO** (también acelera) |
 | Pausa          | Esc / P         | Start                | Botón **II**                          |
+| Reiniciar      | R               | Select / Back        | Menú de pausa                         |
 | Menús          | Flechas + Enter | Cruceta + A / B      | Tocar (1er toque elige, 2º confirma)  |
 
 En móvil se juega en horizontal (se muestra un aviso en vertical). Los controles respetan las _safe areas_ del iPhone

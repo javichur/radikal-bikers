@@ -3,8 +3,9 @@
 ```
 src/
 ├── core/      Utilidades puras: matemáticas, PRNG determinista, bucle de paso fijo, máquina de estados (GameFlow), guardado
-├── content/   Datos del juego: personajes, recorridos (ordenados por dificultad), tipos de vehículo y obstáculos
-├── sim/       Simulación determinista sin DOM: pista, física de la moto, tráfico (incl. tranvía), paso a nivel, reglas, World
+├── content/   Datos del juego: personajes, recorridos (ordenados por dificultad), tipos de vehículo, obstáculos, retos y progresión
+├── sim/       Simulación determinista sin DOM: pista, física de la moto, tráfico (incl. tranvía), paso a nivel,
+│              obras (conos), rival, fantasma, combos, reglas y World
 ├── input/     Teclado, mando (Gamepad API) y controles táctiles → ControlState abstracto
 ├── render/    Three.js: materiales toon, ciudad procedural con estilo por escenario (sceneryStyle), modelos, cámaras
 ├── audio/     Web Audio: motor sintetizado y efectos
@@ -26,7 +27,15 @@ src/
   que se combina con `combineControls`. Las acciones de menú son eventos (`MenuAction`).
 - **Flujo arcade explícito.** `GameFlow` es una máquina de estados sin dependencias:
   `title → characterSelect → stageSelect → countdown → racing ⇄ paused`, `racing → continue → countdown | gameOver`,
-  `racing → finished`. Devuelve _efectos_ (`startRace`, `continueRace`…) que ejecuta `Game`.
+  `racing → finished`. La acción `restart` reinicia desde cualquier pantalla de carrera y los resultados ignoran la
+  entrada durante `RESULT_LOCK_SECONDS`. Devuelve _efectos_ (`startRace`, `restartRace`, `cyclePaint`, `locked`…) que
+  ejecuta `Game`; qué está bloqueado lo decide `Game` (`isLocked`) a partir de las estrellas guardadas.
+- **Eventos de simulación.** `World.step` devuelve `SimEvent`s (`trick`, `comboBanked`, `nearMiss`, `rivalPassed`,
+  `cone`…) que `Game` traduce en HUD, efectos, sonido y cámara lenta (la cámara lenta solo escala el `dt`
+  acumulado; el paso de simulación sigue siendo fijo).
+- **Guardado.** `SaveData` guarda ajustes, récords, perfil (XP y estadísticas), estrellas y atajos (máscaras de bits)
+  y pinturas en una clave; cada fantasma (`sim/ghost.ts`, 15 muestras/s) va en su propia clave
+  `radikal-riders:ghost:<recorrido>:<repartidor>` y se valida al cargar.
 - **Contenido como datos.** Añadir un recorrido o un personaje consiste en añadir una entrada a `content/` y sus textos
   en `ui/locales/` (`stage.<id>.name` y `stage.<id>.desc`). `STAGES` se muestra en orden de dificultad y cada
   `StageDef` elige un estilo de decorado (`scenery`), la mezcla de tráfico y, opcionalmente, obstáculos, pasos a

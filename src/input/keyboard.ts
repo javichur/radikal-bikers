@@ -15,6 +15,7 @@ const MENU_KEYS: Record<string, MenuAction> = {
   Escape: 'pause',
   KeyP: 'pause',
   Backspace: 'back',
+  KeyR: 'restart',
 };
 
 /** Pure mapping from held key codes to controls (unit-testable). */

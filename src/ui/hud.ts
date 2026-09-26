@@ -1,4 +1,6 @@
 import { MS_TO_KMH } from '../core/math';
+import { COMBO_WINDOW, comboMultiplier, comboValue } from '../sim/combo';
+import { BIKE } from '../sim/bike';
 import type { World } from '../sim/world';
 import { h } from './dom';
 import type { I18n } from './i18n';
@@ -24,7 +26,22 @@ export class Hud {
   private readonly explosive: HTMLElement;
   private readonly explosiveLabel: HTMLElement;
   private readonly explosiveTime: HTMLElement;
+  private readonly combo: HTMLElement;
+  private readonly comboMult: HTMLElement;
+  private readonly comboPoints: HTMLElement;
+  private readonly comboLabel: HTMLElement;
+  private readonly comboBar: HTMLElement;
+  private readonly trick: HTMLElement;
+  private readonly record: HTMLElement;
+  private readonly rival: HTMLElement;
+  private readonly rivalMark: HTMLElement;
+  private readonly ghostMark: HTMLElement;
+  private readonly split: HTMLElement;
+  private readonly speedLines: HTMLElement;
   private bannerTimer = 0;
+  private trickTimer = 0;
+  private splitTimer = 0;
+  private best: number | null = null;
   readonly pauseButton: HTMLButtonElement;
 
   constructor(
@@ -51,6 +68,25 @@ export class Hud {
       this.explosiveLabel,
       this.explosiveTime,
     );
+    this.comboMult = h('span', { class: 'hud-combo-mult' });
+    this.comboPoints = h('span', { class: 'hud-combo-points' });
+    this.comboLabel = h('span', { class: 'hud-combo-label' });
+    this.comboBar = h('span', { class: 'hud-combo-fill' });
+    this.combo = h(
+      'div',
+      { class: 'hud-combo', 'data-testid': 'hud-combo' },
+      this.comboLabel,
+      this.comboMult,
+      this.comboPoints,
+      h('span', { class: 'hud-combo-bar' }, this.comboBar),
+    );
+    this.trick = h('div', { class: 'hud-trick' });
+    this.record = h('div', { class: 'hud-record', 'data-testid': 'hud-record' });
+    this.rival = h('div', { class: 'hud-rival', 'data-testid': 'hud-rival' });
+    this.rivalMark = h('span', { class: 'hud-progress-rival' });
+    this.ghostMark = h('span', { class: 'hud-progress-ghost' });
+    this.split = h('div', { class: 'hud-split' });
+    this.speedLines = h('div', { class: 'hud-speedlines' });
     this.pauseButton = h(
       'button',
       { class: 'hud-pause', type: 'button', 'aria-label': 'Pause', onclick: onPause },
@@ -74,10 +110,19 @@ export class Hud {
     this.root = h(
       'div',
       { class: 'hud', 'data-testid': 'hud' },
+      this.speedLines,
       h('div', { class: 'hud-top-left' }, this.timeLabel, this.time),
-      h('div', { class: 'hud-top-center' }, h('div', { class: 'hud-progress' }, this.progressFill, this.progressMarks)),
-      h('div', { class: 'hud-top-right' }, this.scoreLabel, this.score, this.pauseButton),
+      h(
+        'div',
+        { class: 'hud-top-center' },
+        h('div', { class: 'hud-progress' }, this.progressFill, this.progressMarks, this.ghostMark, this.rivalMark),
+        this.rival,
+        this.split,
+      ),
+      h('div', { class: 'hud-top-right' }, this.scoreLabel, this.score, this.record, this.pauseButton),
       h('div', { class: 'hud-speedo' }, svg, h('div', { class: 'hud-speed-text' }, this.speed, this.speedUnit)),
+      this.combo,
+      this.trick,
       this.explosive,
       this.banner,
       this.countdown,
@@ -91,9 +136,43 @@ export class Hud {
     this.scoreLabel.textContent = this.i18n.t('hud.score');
     this.speedUnit.textContent = this.i18n.t('hud.speed');
     this.explosiveLabel.textContent = this.i18n.t('hud.explosive');
+    this.comboLabel.textContent = this.i18n.t('hud.combo');
+  }
+
+  /** Best score of the stage, shown under the score (null hides it). */
+  setBest(best: number | null): void {
+    this.best = best;
+    this.record.classList.toggle('show', best !== null);
+  }
+
+  /** Ghost position as course fraction (null hides the marker). */
+  setGhostProgress(p: number | null): void {
+    this.ghostMark.classList.toggle('show', p !== null);
+    if (p !== null) this.ghostMark.style.left = `${Math.min(1, p) * 100}%`;
+  }
+
+  /** Small pop-up for a trick. */
+  popTrick(text: string, multiplier: number, variant = ''): void {
+    this.trick.textContent = text;
+    this.trick.className = `hud-trick show m${Math.min(5, multiplier)} ${variant}`;
+    this.trickTimer = 0.9;
+  }
+
+  /** Checkpoint split against the ghost (negative = ahead). */
+  showSplit(delta: number): void {
+    this.split.textContent = `${delta <= 0 ? '−' : '+'}${Math.abs(delta).toFixed(2)}`;
+    this.split.className = `hud-split show ${delta <= 0 ? 'ahead' : 'behind'}`;
+    this.splitTimer = 3;
   }
 
   setWorld(world: World): void {
+    this.split.classList.remove('show');
+    this.trick.classList.remove('show');
+    this.bannerTimer = 0;
+    this.banner.classList.remove('show');
+    const rival = world.rival;
+    this.rival.classList.toggle('show', !!rival);
+    this.rivalMark.classList.toggle('show', !!rival);
     this.progressMarks.replaceChildren(
       ...world.rules.checkpoints.map((c) =>
         h('span', { class: 'hud-progress-mark', style: `left:${(c.s / world.rules.finishS) * 100}%` }),
@@ -125,8 +204,41 @@ export class Hud {
     this.speed.textContent = String(kmh);
     const frac = Math.min(1, kmh / GAUGE_MAX_KMH);
     this.gaugeArc.style.strokeDasharray = `${ARC_LEN * frac} ${ARC_LEN * 2}`;
-    this.score.textContent = String(world.score);
+    const score = world.score;
+    this.score.textContent = String(score);
+    if (this.best !== null) {
+      const gap = score - this.best;
+      this.record.textContent = `${this.i18n.t('hud.record')} ${gap >= 0 ? '+' : '−'}${Math.abs(gap)}`;
+      this.record.classList.toggle('beaten', gap > 0);
+    }
     this.progressFill.style.width = `${world.progress * 100}%`;
+    const rival = world.rival;
+    if (rival) {
+      const gap = world.rivalGap ?? 0;
+      const pos = gap > 0 ? '2º' : '1º';
+      this.rival.textContent = `${pos} · ${this.i18n.tk(rival.character.nameKey)} ${gap > 0 ? '+' : '−'}${Math.round(Math.abs(gap))} m`;
+      this.rival.classList.toggle('leading', gap <= 0);
+      this.rivalMark.style.left = `${Math.min(1, rival.bike.s / world.rules.finishS) * 100}%`;
+    }
+    const c = world.combo;
+    this.combo.classList.toggle('show', c.count > 0);
+    if (c.count > 0) {
+      const m = comboMultiplier(c);
+      this.comboMult.textContent = `x${m}`;
+      this.comboPoints.textContent = String(comboValue(c));
+      this.comboBar.style.width = `${Math.max(0, c.timer / COMBO_WINDOW) * 100}%`;
+      this.combo.dataset.mult = String(m);
+    }
+    const speedRatio = Math.max(0, world.bike.speed) / (world.character.stats.topSpeed * BIKE.wheelieBoost);
+    this.speedLines.style.opacity = String(Math.max(0, (speedRatio - 0.7) / 0.3) * 0.8);
+    if (this.trickTimer > 0) {
+      this.trickTimer -= dt;
+      if (this.trickTimer <= 0) this.trick.classList.remove('show');
+    }
+    if (this.splitTimer > 0) {
+      this.splitTimer -= dt;
+      if (this.splitTimer <= 0) this.split.classList.remove('show');
+    }
     const boom = world.bike.explosive;
     this.explosive.classList.toggle('show', boom > 0);
     this.explosive.classList.toggle('ending', boom > 0 && boom <= 2);

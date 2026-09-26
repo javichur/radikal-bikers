@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CONTINUE_SECONDS, COUNTDOWN_SECONDS, GameFlow } from '../../src/core/gameFlow';
+import { CONTINUE_SECONDS, COUNTDOWN_SECONDS, GameFlow, RESULT_LOCK_SECONDS } from '../../src/core/gameFlow';
 
 const flow = (): GameFlow => new GameFlow({ characterCount: 2, stageCount: 1 });
 
@@ -105,8 +105,62 @@ describe('GameFlow', () => {
     f.notifyTimeUp();
     f.update(CONTINUE_SECONDS + 1);
     expect(f.screen).toBe('gameOver');
-    expect(f.handle('confirm')).toEqual({ type: 'quitRace' });
+    // Results ignore input for a moment, then "back" quits to the title.
+    expect(f.handle('back')).toBeNull();
+    f.update(RESULT_LOCK_SECONDS);
+    expect(f.handle('back')).toEqual({ type: 'quitRace' });
     expect(f.screen).toBe('title');
+  });
+
+  it('plays again straight from the results', () => {
+    const f = flow();
+    toRacing(f);
+    f.notifyFinished();
+    f.update(RESULT_LOCK_SECONDS);
+    expect(f.handle('confirm')).toEqual({ type: 'restartRace' });
+    expect(f.screen).toBe('countdown');
+    f.update(COUNTDOWN_SECONDS + 0.01);
+    f.notifyFinished();
+    expect(f.selectResult('menu')).toEqual({ type: 'quitRace' });
+    expect(f.screen).toBe('title');
+    expect(f.selectResult('again')).toBeNull();
+  });
+
+  it('restarts instantly from any race screen, but not from menus', () => {
+    const f = flow();
+    expect(f.handle('restart')).toBeNull();
+    toRacing(f);
+    expect(f.handle('restart')).toEqual({ type: 'restartRace' });
+    expect(f.screen).toBe('countdown');
+    f.update(COUNTDOWN_SECONDS + 0.01);
+    f.notifyTimeUp();
+    expect(f.handle('restart')).toEqual({ type: 'restartRace' });
+    f.update(COUNTDOWN_SECONDS + 0.01);
+    f.notifyFinished();
+    expect(f.handle('restart')).toEqual({ type: 'restartRace' });
+  });
+
+  it('locked riders and stages cannot be confirmed; up/down changes the paint', () => {
+    const f = new GameFlow({
+      characterCount: 3,
+      stageCount: 2,
+      isLocked: (kind, i) => (kind === 'character' ? i === 2 : i === 1),
+    });
+    f.handle('confirm');
+    expect(f.handle('down')).toEqual({ type: 'cyclePaint', dir: 1 });
+    expect(f.handle('up')).toEqual({ type: 'cyclePaint', dir: -1 });
+    f.handle('left');
+    expect(f.characterIndex).toBe(2);
+    expect(f.handle('down')).toBeNull();
+    expect(f.handle('confirm')).toEqual({ type: 'locked' });
+    expect(f.screen).toBe('characterSelect');
+    f.handle('right');
+    f.handle('confirm');
+    expect(f.screen).toBe('stageSelect');
+    f.handle('right');
+    expect(f.handle('confirm')).toEqual({ type: 'locked' });
+    f.handle('right');
+    expect(f.handle('confirm')).toEqual({ type: 'startRace' });
   });
 
   it('declining to continue ends the game', () => {

@@ -12,7 +12,7 @@ interface Particle {
 
 const MAX_PARTICLES = 260;
 
-/** Lightweight particle bursts: explosions, flying glass and bonus sparkles. */
+/** Lightweight particle bursts: explosions, flying glass, sparks, smoke, dust and bonus sparkles. */
 export class Effects {
   private readonly particles: Particle[] = [];
   private readonly shard = new THREE.PlaneGeometry(0.35, 0.25);
@@ -107,6 +107,52 @@ export class Effects {
   sparkle(at: THREE.Vector3): void {
     for (let i = 0; i < 20; i++) {
       this.spawn(this.cube, i % 2 ? 0xffd166 : 0xff7b00, at, Effects.rand(8, 2), 0.7, { gravity: 4, scale: 0.4 });
+    }
+  }
+
+  /** Sparks from scraping a wall or a vehicle. */
+  sparks(at: THREE.Vector3, push: THREE.Vector3): void {
+    for (let i = 0; i < 6; i++) {
+      const v = push.clone().add(Effects.rand(6, 1.5));
+      this.spawn(this.cube, i % 2 ? 0xffd166 : 0xfff3b0, at, v, 0.35 + Math.random() * 0.2, {
+        gravity: 14,
+        scale: 0.18,
+      });
+    }
+  }
+
+  /** Grey smoke puff (crash). */
+  smoke(at: THREE.Vector3): void {
+    for (let i = 0; i < 12; i++) {
+      this.spawn(this.chunk, i % 2 ? 0x6c757d : 0xadb5bd, at, Effects.rand(4, 1.5), 1.2 + Math.random() * 0.5, {
+        grow: 1.8,
+        gravity: -1.5,
+        opacity: 0.55,
+        scale: 0.6,
+      });
+    }
+  }
+
+  /** Dust on landing. */
+  dust(at: THREE.Vector3): void {
+    for (let i = 0; i < 10; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 8, Math.random() * 1.5, (Math.random() - 0.5) * 8);
+      this.spawn(this.chunk, 0xd6c7a1, at, v, 0.6 + Math.random() * 0.3, { grow: 2, opacity: 0.5, scale: 0.35 });
+    }
+  }
+
+  /** Orange/white bits of a knocked cone. */
+  conePop(at: THREE.Vector3): void {
+    for (let i = 0; i < 8; i++) {
+      this.spawn(this.cube, i % 2 ? 0xff7b00 : 0xffffff, at, Effects.rand(7, 3), 0.8, { gravity: 18, scale: 0.3 });
+    }
+  }
+
+  /** Short streak of stars for a combo bank. */
+  confetti(at: THREE.Vector3, amount: number): void {
+    const colors = [0xffd166, 0x06d6a0, 0x118ab2, 0xef476f, 0xffffff];
+    for (let i = 0; i < amount; i++) {
+      this.spawn(this.shard, colors[i % colors.length]!, at, Effects.rand(10, 4), 1, { gravity: 9, scale: 0.6 });
     }
   }
 

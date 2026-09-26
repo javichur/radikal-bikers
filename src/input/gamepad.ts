@@ -5,7 +5,7 @@ const DEADZONE = 0.18;
 export const applyDeadzone = (v: number, dz = DEADZONE): number =>
   Math.abs(v) < dz ? 0 : Math.sign(v) * ((Math.abs(v) - dz) / (1 - dz));
 
-/** Standard-mapping gamepads: stick/dpad steer, RT gas, LT brake, A/RB wheelie. */
+/** Standard-mapping gamepads: stick/dpad steer, RT gas, LT brake, A/RB wheelie, Back/Select instant restart. */
 export class GamepadInput implements InputSource {
   private prev = new Map<number, boolean>();
 
@@ -31,6 +31,7 @@ export class GamepadInput implements InputSource {
       [0, 'confirm'],
       [1, 'back'],
       [9, 'pause'],
+      [8, 'restart'],
     ];
     for (const [i, a] of edges) {
       const now = pressed(i);

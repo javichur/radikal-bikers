@@ -39,10 +39,9 @@ export class UpdateChecker {
     this.checking = true;
     try {
       const remote = await this.opts.fetchVersion();
-      if (remote && remote !== this.opts.current && this.readReloaded() !== remote) {
-        this.pending = remote;
-        this.onScreen(this.opts.getScreen());
-      }
+      if (!remote || remote === this.opts.current || this.readReloaded() === remote) return;
+      this.pending = remote;
+      this.onScreen(this.opts.getScreen());
     } catch {
       // Network errors are ignored; we'll retry on the next resume.
     } finally {
@@ -57,8 +56,10 @@ export class UpdateChecker {
   /** Call on every screen change; reloads once a pending update is safe to apply. */
   onScreen(screen: Screen): void {
     if (this.pending === null || !SAFE_RELOAD_SCREENS.includes(screen)) return;
+    const pending = this.pending;
+    this.pending = null;
     try {
-      this.opts.storage?.setItem(RELOADED_KEY, this.pending);
+      this.opts.storage?.setItem(RELOADED_KEY, pending);
     } catch {
       // Storage may be unavailable (private mode); reload anyway.
     }
@@ -76,10 +77,14 @@ export class UpdateChecker {
 
 /** Fetches `version.json` bypassing HTTP and browser caches. */
 export const fetchDeployedVersion = async (baseUrl: string): Promise<string | null> => {
-  const url = new URL('version.json', baseUrl);
-  url.searchParams.set('t', String(Date.now()));
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { version?: unknown };
-  return typeof data.version === 'string' ? data.version : null;
+  try {
+    const url = new URL('version.json', baseUrl);
+    url.searchParams.set('t', String(Date.now()));
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { version?: unknown };
+    return typeof data.version === 'string' ? data.version : null;
+  } catch {
+    return null;
+  }
 };

@@ -271,7 +271,8 @@ describe('explosive bonus', () => {
     expect(events.some((e) => e.type === 'explode' && e.vehicleId === 77)).toBe(true);
     expect(events.some((e) => e.type === 'crash')).toBe(false);
     expect(w.traffic.vehicles.some((v) => v.id === 77)).toBe(false);
-    expect(w.race.bonusPoints).toBe(EXPLODE_POINTS);
+    expect(events).toContainEqual({ type: 'trick', kind: 'explode', points: EXPLODE_POINTS, multiplier: 1 });
+    expect(w.combo.pending).toBe(EXPLODE_POINTS);
 
     // Side swipes at full lean don't knock the rider down either.
     w.traffic.vehicles.push({ ...bus(w.bike.s + 1, w.bike.d + 2), id: 78 });
@@ -279,9 +280,13 @@ describe('explosive bonus', () => {
     w.bike.speed = 30;
     const swipe = run(w, 0.2, controls({ throttle: 1, steer: 1 }));
     expect(swipe.some((e) => e.type === 'crash')).toBe(false);
+    expect(swipe.some((e) => e.type === 'explode' && e.vehicleId === 78)).toBe(true);
     expect(w.bike.crashes).toBe(0);
 
-    run(w, BIKE.explosiveDuration, controls());
+    const later0 = run(w, BIKE.explosiveDuration, controls());
+    // The combo is banked once no other trick follows.
+    expect(later0.some((e) => e.type === 'comboBanked')).toBe(true);
+    expect(w.race.bonusPoints).toBe(EXPLODE_POINTS * 2);
     expect(w.bike.explosive).toBe(0);
     w.traffic.vehicles.length = 0;
     w.traffic.vehicles.push(bus(w.bike.s + 12, w.bike.d));

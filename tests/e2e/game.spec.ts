@@ -42,6 +42,33 @@ test.describe('desktop', () => {
     await expect(screen(page)).toHaveAttribute('data-screen', 'title');
   });
 
+  test('locked content, instant restart and results', async ({ page }) => {
+    await page.goto('./?e2e&quality=low');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('[data-character=nitro]')).toHaveClass(/locked/);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('[data-stage=harborNight]')).toHaveClass(/locked/);
+    await expect(page.locator('[data-stage=harbor] .challenges li')).toHaveCount(3);
+    await page.keyboard.press('Enter');
+    await expect(screen(page)).toHaveAttribute('data-screen', 'racing', { timeout: 30_000 });
+
+    await page.keyboard.press('KeyR');
+    await expect(screen(page)).toHaveAttribute('data-screen', 'countdown');
+    await expect(screen(page)).toHaveAttribute('data-screen', 'racing', { timeout: 30_000 });
+
+    // Run out of time without continuing to reach the results screen.
+    await page.evaluate(() => {
+      const rr = (window as unknown as { __RR__: { game: { world: { race: { timeLeft: number } } } } }).__RR__;
+      rr.game.world.race.timeLeft = 0.01;
+    });
+    await expect(screen(page)).toHaveAttribute('data-screen', 'continue');
+    await page.keyboard.press('Escape');
+    await expect(screen(page)).toHaveAttribute('data-screen', 'gameOver', { timeout: 20_000 });
+    await expect(page.locator('.result .xp')).toBeVisible();
+    await page.getByRole('button', { name: /again|otra/i }).click();
+    await expect(screen(page)).toHaveAttribute('data-screen', 'countdown');
+  });
+
   test('language toggle is persisted', async ({ page }) => {
     await page.goto('./');
     const toggle = page.getByRole('button', { name: /language|idioma/i });

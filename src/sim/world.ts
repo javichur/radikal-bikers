@@ -1,5 +1,6 @@
 import { Rng } from '../core/rng';
-import type { CharacterDef } from '../content/characters';
+import type { RunSummary } from '../content/challenges';
+import { CHARACTERS, type CharacterDef } from '../content/characters';
 import { OBSTACLES, type ObstacleKind } from '../content/obstacles';
 import type { StageDef } from '../content/stages';
 import { VEHICLES } from '../content/vehicles';
@@ -15,7 +16,9 @@ import {
   trainOnRoad,
   type CrossingState,
 } from './crossing';
+import { addTrick, bankCombo, breakCombo, createCombo, stepCombo, TRICK_POINTS, type ComboState } from './combo';
 import type { SimEvent } from './events';
+import { GhostRecorder } from './ghost';
 import {
   computeScore,
   continueRace,
@@ -25,6 +28,8 @@ import {
   type RaceRules,
   type RaceState,
 } from './race';
+import { createRival, stepRival, type RivalState } from './rival';
+import { buildCones, CONE_RADIUS, laneClosed, pickWorkZones, type Cone, type WorkZone } from './roadworks';
 import { buildRoute, ROUTE_HALF_WIDTH, routeToMainS, type Route } from './shortcuts';
 import { Track } from './track';
 import { overlaps, Traffic, type Box, type Vehicle } from './traffic';
@@ -68,8 +73,33 @@ const CONES_SPEED_KEEP = 0.8;
 const BELL_DISTANCE = 400;
 export const PICKUP_RADIUS = 1.6;
 export const PICKUP_RESPAWN = 25;
-/** Points for every vehicle blown up. */
-export const EXPLODE_POINTS = 1000;
+/** Base points for every vehicle blown up (before the combo multiplier). */
+export const EXPLODE_POINTS = TRICK_POINTS.explode;
+/** Bonus for delivering before the rival. */
+export const RIVAL_POINTS = 5000;
+/** Lateral clearance (m) under which passing a vehicle counts as a near miss. */
+export const NEAR_MISS_GAP = 1.1;
+/** Minimum speed difference with the vehicle for a near miss. */
+const NEAR_MISS_REL_SPEED = 8;
+const NEAR_MISS_MIN_SPEED = 12;
+/** Minimum wheelie / airtime (s) that counts as a trick. */
+const WHEELIE_TRICK_TIME = 1;
+const AIR_TRICK_TIME = 0.4;
+/** Speed kept after knocking a cone over. */
+const CONE_SPEED_KEEP = 0.9;
+
+/** Run statistics used by challenges, the career profile and the results screen. */
+export interface RunStats {
+  nearMisses: number;
+  /** Longest single wheelie, seconds. */
+  maxWheelie: number;
+  /** Longest airtime, seconds. */
+  maxAirtime: number;
+  readonly shortcuts: Set<number>;
+  explosions: number;
+  glass: number;
+  cones: number;
+}
 /** Speed kept after smashing through a shop window. */
 const GLASS_SPEED_KEEP = 0.85;
 
@@ -83,8 +113,28 @@ export class World {
   readonly pickups: readonly Pickup[];
   readonly obstacles: readonly ObstacleState[];
   readonly crossings: readonly Crossing[];
+  readonly zones: readonly WorkZone[];
+  readonly cones: readonly Cone[];
+  readonly rival: RivalState | null;
   bike: BikeState;
   race: RaceState;
+  readonly combo: ComboState = createCombo();
+  readonly stats: RunStats = {
+    nearMisses: 0,
+    maxWheelie: 0,
+    maxAirtime: 0,
+    shortcuts: new Set(),
+    explosions: 0,
+    glass: 0,
+    cones: 0,
+  };
+  /** Records this run so it can become the ghost to beat. */
+  readonly recorder = new GhostRecorder();
+  beatRival = false;
+  private readonly nearMissed = new Set<number>();
+  private readonly touched = new Set<number>();
+  private wheelieRun = 0;
+  private airtime = 0;
   /** Simulation clock (also runs during the countdown): drives the train timetable. */
   time = 0;
   /** Vertical speed of the road under the grounded bike (detects crests). */
@@ -116,8 +166,15 @@ export class World {
       period: c.period,
       offset: c.offset,
     }));
+    this.zones = pickWorkZones(stage, this.track.length, seed);
+    this.cones = buildCones(this.zones);
     this.bike = createBike(5, stage.lanes.forward[0] ?? 0);
     this.race = createRace(this.rules);
+    const rival = stage.rival
+      ? (CHARACTERS.find((c) => c.id === stage.rival && c.id !== character.id) ??
+        CHARACTERS.find((c) => c.id !== character.id))
+      : undefined;
+    this.rival = rival ? createRival(rival, stage) : null;
     this.traffic = new Traffic(
       {
         trackLength: this.track.length,
@@ -126,6 +183,7 @@ export class World {
         density: stage.trafficDensity,
         mix: stage.trafficMix,
         oncomingSpeedScale: stage.oncomingSpeedScale,
+        laneClosed: (s, d, margin) => laneClosed(this.zones, s, d, margin),
       },
       new Rng(seed),
     );
@@ -193,11 +251,140 @@ export class World {
       this.resolveTrafficCollisions(events);
       this.resolveObstacles(events);
       this.resolveCrossings(states, events);
+      this.detectNearMisses(events);
+      this.hitCones(events);
     }
     if (events.some((e) => e.type === 'respawn')) this.placeSafely();
+    if (this.rival) {
+      stepRival(
+        this.rival,
+        {
+          track: this.track,
+          stage: this.stage,
+          ramps: this.ramps,
+          vehicles: this.traffic.vehicles,
+          zones: this.zones,
+          finishS: this.rules.finishS,
+          playerS: this.mainS,
+          elapsed: this.race.elapsed,
+        },
+        raceRunning && !finished,
+        dt,
+        events,
+      );
+    }
 
-    if (raceRunning) stepRace(this.race, this.rules, this.mainS, dt, events);
+    if (raceRunning && !finished) {
+      this.scoreTricks(events, dt);
+      stepRace(this.race, this.rules, this.mainS, dt, events);
+      this.race.bonusPoints += stepCombo(this.combo, dt, events);
+      this.recorder.sample(this.race.elapsed, b);
+      for (const e of events) {
+        if (e.type === 'checkpoint') this.recorder.split(this.race.elapsed);
+        else if (e.type === 'timeUp') this.race.bonusPoints += bankCombo(this.combo, events);
+        else if (e.type === 'finish') {
+          this.race.bonusPoints += bankCombo(this.combo, events);
+          this.beatRival = !!this.rival && !this.rival.finished;
+          if (this.beatRival) this.race.bonusPoints += RIVAL_POINTS;
+        }
+      }
+    }
     return events;
+  }
+
+  /** Turns risky riding into combo points; a crash loses the pending combo. */
+  private scoreTricks(events: SimEvent[], dt: number): void {
+    const b = this.bike;
+    const c = this.combo;
+    const n = events.length;
+    for (let i = 0; i < n; i++) {
+      const e = events[i]!;
+      switch (e.type) {
+        case 'crash':
+          this.wheelieRun = 0;
+          this.airtime = 0;
+          breakCombo(c, events);
+          break;
+        case 'nearMiss':
+          this.stats.nearMisses++;
+          addTrick(c, 'nearMiss', events);
+          break;
+        case 'glass':
+          this.stats.glass++;
+          addTrick(c, 'glass', events);
+          break;
+        case 'shortcut':
+          this.stats.shortcuts.add(e.route);
+          addTrick(c, 'shortcut', events);
+          break;
+        case 'explode':
+          this.stats.explosions++;
+          addTrick(c, 'explode', events);
+          break;
+        case 'jump':
+          this.airtime = 0;
+          break;
+        case 'land':
+          if (b.crashTimer <= 0 && this.airtime >= AIR_TRICK_TIME) addTrick(c, 'jump', events, 1 + this.airtime);
+          this.stats.maxAirtime = Math.max(this.stats.maxAirtime, this.airtime);
+          this.airtime = 0;
+          break;
+        default:
+          break;
+      }
+    }
+    if (b.airborne) this.airtime += dt;
+    if (b.wheelie > 0.5 && b.crashTimer <= 0) {
+      this.wheelieRun += dt;
+      this.stats.maxWheelie = Math.max(this.stats.maxWheelie, this.wheelieRun);
+    } else {
+      if (this.wheelieRun >= WHEELIE_TRICK_TIME) addTrick(c, 'wheelie', events, this.wheelieRun);
+      this.wheelieRun = 0;
+    }
+  }
+
+  /** Passing a vehicle by a hair (without touching it) at a decent speed. */
+  private detectNearMisses(events: SimEvent[]): void {
+    const b = this.bike;
+    if (b.crashTimer > 0 || b.speed < NEAR_MISS_MIN_SPEED) return;
+    for (const v of this.traffic.vehicles) {
+      if (this.nearMissed.has(v.id) || this.touched.has(v.id)) continue;
+      if (Math.abs(b.s - v.s) > v.length / 2 + BIKE.length / 2) continue;
+      const gap = Math.abs(b.d - v.d) - (v.width + BIKE.width) / 2;
+      if (gap < 0 || gap > NEAR_MISS_GAP) continue;
+      if (Math.abs(b.speed - v.speed * v.dir) < NEAR_MISS_REL_SPEED) continue;
+      this.nearMissed.add(v.id);
+      events.push({ type: 'nearMiss', vehicleId: v.id });
+    }
+  }
+
+  /** Roadworks cones get knocked over and slow the rider a little. */
+  private hitCones(events: SimEvent[]): void {
+    const b = this.bike;
+    if (b.crashTimer > 0 || b.height > 0.8) return;
+    for (let i = 0; i < this.cones.length; i++) {
+      const c = this.cones[i]!;
+      if (c.hit || Math.abs(b.s - c.s) > BIKE.length / 2 + CONE_RADIUS) continue;
+      if (Math.abs(b.d - c.d) > BIKE.width / 2 + CONE_RADIUS) continue;
+      c.hit = true;
+      this.stats.cones++;
+      if (b.explosive <= 0) b.speed *= CONE_SPEED_KEEP;
+      events.push({ type: 'cone', index: i });
+    }
+  }
+
+  /** Summary of the run for challenges and the career profile. */
+  summary(): RunSummary {
+    return {
+      finished: this.race.finished,
+      crashes: this.bike.crashes,
+      nearMisses: this.stats.nearMisses,
+      maxWheelie: this.stats.maxWheelie,
+      shortcuts: this.stats.shortcuts.size,
+      explosions: this.stats.explosions,
+      bestCombo: this.combo.best,
+      beatRival: this.beatRival,
+    };
   }
 
   /** Track the bike is currently riding on. */
@@ -377,7 +564,6 @@ export class World {
         // Explosive bonus: the vehicle blows up and the rider ploughs on.
         vehicles.splice(i, 1);
         b.speed *= 0.9;
-        this.race.bonusPoints += EXPLODE_POINTS;
         events.push({ type: 'explode', vehicleId: v.id, s: v.s, d: v.d });
         continue;
       }
@@ -396,6 +582,7 @@ export class World {
           crashBike(b, 'vehicle', events);
           return;
         }
+        this.touched.add(v.id);
         b.d = v.d + sideD * (vBox.halfWidth + bikeBox.halfWidth + 0.05);
         if (lateral > 0) b.yaw *= -0.3;
         b.speed *= 0.97;
@@ -414,6 +601,7 @@ export class World {
         return;
       }
       // Gentle rear-end nudge: match speed and back off.
+      this.touched.add(v.id);
       b.speed = Math.max(0, v.speed * v.dir);
       b.s = v.s - sideS * (vBox.halfLength + bikeBox.halfLength + 0.05);
       events.push({ type: 'scrape' });
@@ -497,6 +685,19 @@ export class World {
     this.roadVy = 0;
     this.traffic.vehicles.length = 0;
     this.traffic.populate(b.s);
+    this.wheelieRun = 0;
+    this.airtime = 0;
+    const r = this.rival;
+    if (r && !r.finished && r.bike.s < b.s - 20) {
+      const rb = createBike(b.s - 20, r.targetD);
+      rb.crashes = r.bike.crashes;
+      r.bike = rb;
+    }
+  }
+
+  /** Rival distance ahead of the player (negative = behind), or null without a rival. */
+  get rivalGap(): number | null {
+    return this.rival ? this.rival.bike.s - this.mainS : null;
   }
 
   get progress(): number {

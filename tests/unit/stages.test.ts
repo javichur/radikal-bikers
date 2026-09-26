@@ -16,15 +16,15 @@ describe('stage list', () => {
     expect([...levels].sort((a, b) => a - b)).toEqual(levels);
     expect(levels[0]).toBe(1);
     expect(new Set(STAGES.map((s) => s.id)).size).toBe(STAGES.length);
-    expect(new Set(STAGES.map((s) => s.scenery)).size).toBe(STAGES.length);
+    expect(new Set(STAGES.map((s) => s.scenery))).toEqual(new Set(['beach', 'city', 'oldtown', 'industrial', 'hills']));
     for (const l of levels) expect(l).toBeGreaterThanOrEqual(1);
     for (const l of levels) expect(l).toBeLessThanOrEqual(5);
   });
 
   it('the easy route gives more time per checkpoint-free stretch and the hard one is the longest', () => {
     const lengths = STAGES.map((s) => new Track(s.controlPoints, 1, s.profile).length);
-    const hardest = lengths[lengths.length - 1]!;
-    expect(Math.max(...lengths)).toBe(hardest);
+    const hills = STAGES.find((s) => s.id === 'hills')!;
+    expect(Math.max(...lengths)).toBe(new Track(hills.controlPoints, 1, hills.profile).length);
     const first = STAGES[0]!;
     expect(first.startTime).toBeGreaterThanOrEqual(Math.max(...STAGES.map((s) => s.startTime)));
   });

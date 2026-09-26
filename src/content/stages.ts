@@ -1,3 +1,4 @@
+import type { ChallengeDef, GradeThresholds } from './challenges';
 import type { ObstacleKind } from './obstacles';
 import type { TrafficMix } from './vehicles';
 
@@ -61,12 +62,24 @@ export interface StageDef {
   readonly trafficMix?: TrafficMix;
   /** Cruise speed multiplier for oncoming traffic. */
   readonly oncomingSpeedScale?: number;
+  /** Candidate roadworks (a line of cones closing a lane); `roadworksPerRace` of them are picked at random. */
+  readonly roadworks: readonly { readonly at: number; readonly d: number; readonly length: number }[];
+  readonly roadworksPerRace: number;
+  /** Id of the rival rider (versus); if the player picks that rider, another one races instead. */
+  readonly rival: string | null;
+  /** Score thresholds of the S/A/B grades. */
+  readonly grades: GradeThresholds;
+  /** Three challenges, one star each. */
+  readonly challenges: readonly ChallengeDef[];
+  /** Total stars needed to unlock the stage (0 = always available). */
+  readonly unlockStars: number;
   readonly theme: {
     readonly sky: number;
     readonly fog: number;
     readonly ground: number;
     readonly road: number;
     readonly buildings: readonly number[];
+    readonly night?: boolean;
   };
   readonly seed: number;
 }
@@ -189,6 +202,16 @@ export const STAGES: readonly StageDef[] = [
       [62, 6000],
     ],
     trafficDensity: 12,
+    roadworks: [],
+    roadworksPerRace: 0,
+    rival: 'luna',
+    grades: { s: 65000, a: 50000, b: 35000 },
+    challenges: [
+      { kind: 'noCrash', target: 0 },
+      { kind: 'shortcuts', target: 2 },
+      { kind: 'wheelieStreak', target: 2 },
+    ],
+    unlockStars: 0,
     theme: {
       sky: 0x6fd3ff,
       fog: 0xc9f0ff,
@@ -276,6 +299,24 @@ export const STAGES: readonly StageDef[] = [
       { route: 2, at: 0.5, d: 0 },
     ],
     trafficDensity: 16,
+    roadworks: [
+      { at: 0.08, d: 9, length: 40 },
+      { at: 0.18, d: -9, length: 50 },
+      { at: 0.33, d: 3, length: 30 },
+      { at: 0.5, d: -3, length: 45 },
+      { at: 0.66, d: 9, length: 40 },
+      { at: 0.8, d: -9, length: 50 },
+      { at: 0.92, d: 3, length: 35 },
+    ],
+    roadworksPerRace: 2,
+    rival: 'rocco',
+    grades: { s: 75000, a: 60000, b: 45000 },
+    challenges: [
+      { kind: 'wheelieStreak', target: 2.5 },
+      { kind: 'shortcuts', target: 2 },
+      { kind: 'noCrash', target: 0 },
+    ],
+    unlockStars: 0,
     theme: {
       sky: 0x7ec8ff,
       fog: 0xbfe3ff,
@@ -360,6 +401,16 @@ export const STAGES: readonly StageDef[] = [
     ],
     trafficDensity: 10,
     trafficMix: { car: 3, taxi: 2, van: 2, motocarro: 3, tram: 1 },
+    roadworks: [],
+    roadworksPerRace: 0,
+    rival: 'nitro',
+    grades: { s: 80000, a: 62000, b: 46000 },
+    challenges: [
+      { kind: 'shortcuts', target: 3 },
+      { kind: 'noCrash', target: 0 },
+      { kind: 'explode', target: 2 },
+    ],
+    unlockStars: 0,
     theme: {
       sky: 0x8fd3ff,
       fog: 0xf3e1c0,
@@ -427,6 +478,16 @@ export const STAGES: readonly StageDef[] = [
     crossings: [{ at: 0.11, period: 40, offset: 26 }],
     trafficDensity: 18,
     trafficMix: { car: 3, taxi: 1, van: 3, bus: 1, truck: 4 },
+    roadworks: [],
+    roadworksPerRace: 0,
+    rival: 'luna',
+    grades: { s: 85000, a: 68000, b: 50000 },
+    challenges: [
+      { kind: 'explode', target: 3 },
+      { kind: 'beatRival', target: 0 },
+      { kind: 'noCrash', target: 0 },
+    ],
+    unlockStars: 0,
     theme: {
       sky: 0xa9c6d9,
       fog: 0xcfd8dc,
@@ -530,6 +591,16 @@ export const STAGES: readonly StageDef[] = [
     trafficDensity: 8,
     trafficMix: { car: 5, van: 2, truck: 2, bus: 1 },
     oncomingSpeedScale: 1.3,
+    roadworks: [],
+    roadworksPerRace: 0,
+    rival: 'nitro',
+    grades: { s: 90000, a: 72000, b: 54000 },
+    challenges: [
+      { kind: 'nearMiss', target: 8 },
+      { kind: 'beatRival', target: 0 },
+      { kind: 'wheelieStreak', target: 3 },
+    ],
+    unlockStars: 0,
     theme: {
       sky: 0x87ceeb,
       fog: 0xd6eadf,
@@ -538,6 +609,112 @@ export const STAGES: readonly StageDef[] = [
       buildings: [0xf4e1c1, 0xe8c39e, 0xf2d0a4, 0xdcc7aa, 0xffe8d6, 0xe9d8a6],
     },
     seed: 2000,
+  },
+  {
+    id: 'harborNight',
+    nameKey: 'stage.harborNight.name',
+    descriptionKey: 'stage.harborNight.desc',
+    difficulty: 5,
+    scenery: 'city',
+    controlPoints: [
+      [0, -40, 0],
+      [0, 0, 0],
+      [0, 220, 0],
+      [40, 400, 2],
+      [160, 540, 6],
+      [340, 580, 8],
+      [520, 540, 6],
+      [640, 420, 2],
+      [700, 240, 0],
+      [820, 110, 0],
+      [1000, 90, 3],
+      [1160, 170, 8],
+      [1240, 330, 10],
+      [1220, 530, 6],
+      [1120, 690, 2],
+      [1140, 870, 0],
+      [1260, 990, 0],
+      [1460, 1010, 0],
+      [1520, 1010, 0],
+    ],
+    roadHalfWidth: 12,
+    lanes: { forward: [3, 9], oncoming: [-3, -9] },
+    startTime: 40,
+    checkpoints: [
+      { at: 0.22, bonus: 30 },
+      { at: 0.46, bonus: 28 },
+      { at: 0.7, bonus: 25 },
+    ],
+    ramps: [
+      { at: 0.12, d: 0, width: 8 },
+      { at: 0.4, d: -6, width: 8 },
+      { at: 0.63, d: 6, width: 8 },
+      { at: 0.85, d: 0, width: 10 },
+    ],
+    profile: [
+      { at: 0, y: 0 },
+      { at: 0.045, y: 0 },
+      { at: 0.053, y: 2.6 },
+      { at: 0.061, y: 0.4 },
+      { at: 0.069, y: 3 },
+      { at: 0.077, y: 0 },
+      { at: 0.29, y: 0 },
+      { at: 0.31, y: 9 },
+      { at: 0.37, y: 9 },
+      { at: 0.39, y: 0 },
+      { at: 0.72, y: 0 },
+      { at: 0.728, y: 3.2 },
+      { at: 0.736, y: 0.6 },
+      { at: 0.744, y: 3.4 },
+      { at: 0.752, y: 0.8 },
+      { at: 0.76, y: 3 },
+      { at: 0.768, y: 0 },
+      { at: 1, y: 0 },
+    ],
+    shortcuts: [
+      { from: 0.13, to: 0.29, side: -1, kind: 'alley' },
+      { from: 0.415, to: 0.515, side: 1, kind: 'shop' },
+      { from: 0.61, to: 0.71, side: 1, kind: 'alley' },
+      { from: 0.785, to: 0.88, side: -1, kind: 'shop' },
+    ],
+    tunnels: [{ from: 0.53, to: 0.6 }],
+    bridges: [{ from: 0.3, to: 0.38 }],
+    pickups: [
+      { route: -1, at: 0.09, d: 6 },
+      { route: -1, at: 0.42, d: -6 },
+      { route: -1, at: 0.61, d: 3 },
+      { route: -1, at: 0.9, d: -3 },
+      { route: 0, at: 0.5, d: 0 },
+      { route: 2, at: 0.5, d: 0 },
+    ],
+    trafficDensity: 19,
+    roadworks: [
+      { at: 0.08, d: 9, length: 40 },
+      { at: 0.18, d: -9, length: 50 },
+      { at: 0.33, d: 3, length: 30 },
+      { at: 0.5, d: -3, length: 45 },
+      { at: 0.66, d: 9, length: 40 },
+      { at: 0.8, d: -9, length: 50 },
+      { at: 0.92, d: 3, length: 35 },
+    ],
+    roadworksPerRace: 3,
+    rival: 'nitro',
+    grades: { s: 80000, a: 65000, b: 50000 },
+    challenges: [
+      { kind: 'nearMiss', target: 12 },
+      { kind: 'combo', target: 6 },
+      { kind: 'beatRival', target: 0 },
+    ],
+    unlockStars: 2,
+    theme: {
+      sky: 0x14163a,
+      fog: 0x2a2f5c,
+      ground: 0x2f4a3a,
+      road: 0x2a2d38,
+      buildings: [0x6d597a, 0x355070, 0xb56576, 0x3d5a80, 0x6a4c93, 0x1982c4, 0x8ac926, 0xe56b6f],
+      night: true,
+    },
+    seed: 2026,
   },
 ];
 

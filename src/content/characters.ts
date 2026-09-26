@@ -16,6 +16,8 @@ export interface CharacterDef {
   readonly bioKey: string;
   readonly colors: { readonly body: number; readonly jacket: number; readonly helmet: number };
   readonly stats: CharacterStats;
+  /** Total stars needed to unlock the rider (0 = always available). */
+  readonly unlockStars: number;
 }
 
 export const CHARACTERS: readonly CharacterDef[] = [
@@ -25,6 +27,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
     bioKey: 'char.rocco.bio',
     colors: { body: 0xe63946, jacket: 0x1d3557, helmet: 0xf1faee },
     stats: { topSpeed: 36, acceleration: 9, handling: 1.55, weight: 1.2 },
+    unlockStars: 0,
   },
   {
     id: 'luna',
@@ -32,6 +35,15 @@ export const CHARACTERS: readonly CharacterDef[] = [
     bioKey: 'char.luna.bio',
     colors: { body: 0x2ec4b6, jacket: 0xff9f1c, helmet: 0x3a0ca3 },
     stats: { topSpeed: 33, acceleration: 11, handling: 1.95, weight: 0.9 },
+    unlockStars: 0,
+  },
+  {
+    id: 'nitro',
+    nameKey: 'char.nitro.name',
+    bioKey: 'char.nitro.bio',
+    colors: { body: 0xffbe0b, jacket: 0x14213d, helmet: 0xfb5607 },
+    stats: { topSpeed: 38, acceleration: 10, handling: 1.6, weight: 1 },
+    unlockStars: 4,
   },
 ];
 
