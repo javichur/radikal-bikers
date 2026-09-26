@@ -145,67 +145,222 @@ const trencadis = (g: THREE.Group, w: number, y: number, z: number, colors: read
   });
 };
 
+/** Parametric surface over u, v in [0, 1], leaving out the cells where `hole` is true (for cut-outs). */
+const surface = (
+  nu: number,
+  nv: number,
+  fn: (u: number, v: number, out: THREE.Vector3) => void,
+  hole?: (u: number, v: number) => boolean,
+): THREE.BufferGeometry => {
+  const pos: number[] = [];
+  const index: number[] = [];
+  const p = new THREE.Vector3();
+  for (let j = 0; j <= nv; j++) {
+    for (let i = 0; i <= nu; i++) {
+      fn(i / nu, j / nv, p);
+      pos.push(p.x, p.y, p.z);
+    }
+  }
+  for (let j = 0; j < nv; j++) {
+    for (let i = 0; i < nu; i++) {
+      if (hole?.((i + 0.5) / nu, (j + 0.5) / nv)) continue;
+      const a = j * (nu + 1) + i;
+      const b = a + nu + 1;
+      index.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(index);
+  geo.computeVertexNormals();
+  return geo;
+};
+
 const models: Record<MonumentKind, (g: THREE.Group) => void> = {
   palauArts: (g) => {
-    // Palau de les Arts: two white trencadís shells, cut away to show the glazed auditorium, wrapped around a
-    // podium and crowned by the long steel "feather" cantilevered from the back, over its reflecting ponds.
-    g.add(box(84, 0.3, 46, 0x4cc9f0, 0, 0, 0, false));
-    g.add(box(60, 4, 26, 0xe9ecef, 0, 0, 0));
-    g.add(mesh(new THREE.BoxGeometry(40, 16, 18), GLASS, 0, 12, 1, 0x0b2a3a));
+    // Palau de les Arts Reina Sofia (230 m long, 75 m high, here at ~1:2.2): the two mirrored steel shells clad in
+    // white trencadís, pierced by large almond cut-outs that show the stacked glazed terraces of the auditoriums,
+    // over a podium in the reflecting ponds; between them springs the 230 m steel "feather", rising from the back and
+    // cantilevered over the entrance.
+    g.add(box(104, 0.3, 58, 0x4cc9f0, 0, 0, 0, false));
+    g.add(box(80, 4, 34, 0xe9ecef, 0, 0, 0));
+    g.add(box(76, 1.2, 0.2, DARK, 0, 1.4, 17.1, false));
+    for (let k = 0; k < 5; k++) {
+      const w = 52 - 7 * k;
+      const d = 24 - 3 * k;
+      const y = 4 + k * 4.4;
+      g.add(mesh(new THREE.BoxGeometry(w, 4, d), GLASS, -k, y + 2, 0, 0x0b2a3a));
+      g.add(box(w + 2, 0.5, d + 2, WHITE, -k, y + 3.9, 0, false));
+    }
+    // External stairs climbing the podium to the terraces.
+    for (const s of [-1, 1]) {
+      const stair = box(22, 0.8, 4, 0xd8d8d0, s * 22, 1.6, 19, false);
+      stair.rotation.z = s * 0.18;
+      g.add(stair);
+    }
+    // The shells: each is a helmet-shaped sheet, legs on the ground at both ends, lifting over the podium in the
+    // middle and curling in towards the gap that holds the feather.
+    const trencadisMat = toon(0xf8f8f6, { side: THREE.DoubleSide });
     for (const k of [-1, 1]) {
-      // Each shell is a tilted half-ellipsoid, open on the inner side.
-      const shell = mesh(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI), WHITE, 0, 18, k * 7);
-      shell.material = toon(WHITE, { side: THREE.DoubleSide });
-      shell.scale.set(36, 20, 10);
-      shell.rotation.set(0, k > 0 ? 0 : Math.PI, k * 0.12);
+      const geo = surface(
+        28,
+        14,
+        (u, v, out) => {
+          const a = u * 2 - 1;
+          const top = 4 + 24 * Math.sqrt(Math.max(0, 1 - ((a + 0.1) / 1.1) ** 2));
+          const bottom = 7 * (1 - a * a);
+          const reach = 4 + 17 * Math.sqrt(Math.max(0, 1 - a * a));
+          const s = Math.sin((v * Math.PI) / 2);
+          const c = Math.cos((v * Math.PI) / 2);
+          out.set(38 * a, bottom + (top - bottom) * s, k * (2.5 + (reach - 2.5) * c));
+        },
+        (u, v) => ((u * 2 - 1.05) / 0.5) ** 2 + ((v - 0.42) / 0.26) ** 2 < 1,
+      );
+      const shell = new THREE.Mesh(geo, trencadisMat);
+      shell.castShadow = true;
       g.add(shell);
     }
-    const feather = mesh(new THREE.BoxGeometry(76, 1.4, 5), 0xd9dde3, 8, 38, 0);
-    feather.rotation.z = -0.14;
-    g.add(feather);
-    for (let i = 0; i < 9; i++) {
-      const x = -26 + i * 8;
-      g.add(
-        rod(new THREE.Vector3(x, 38 + Math.tan(0.14) * (8 - x) - 0.8, 0), new THREE.Vector3(x, 30, 0), 0.25, 0xc0c4ca),
-      );
+    // The feather: a tapering steel blade between the shell crests, combed with cross ribs.
+    const featherAt = (u: number): { x: number; y: number; w: number } => ({
+      x: -42 + 96 * u,
+      y: 18 + 16 * (1 - (1 - u) ** 2),
+      w: 2.2 * (1 - 0.7 * u),
+    });
+    const feather = surface(32, 4, (u, v, out) => {
+      const p = featherAt(u);
+      const across = v * 2 - 1;
+      out.set(p.x, p.y - 0.4 * across * across, across * p.w);
+    });
+    g.add(new THREE.Mesh(feather, toon(0xd9dde3, { side: THREE.DoubleSide })));
+    for (let u = 0.04; u < 1; u += 0.06) {
+      const p = featherAt(u);
+      const q = featherAt(u + 0.01);
+      const rib = mesh(new THREE.BoxGeometry(0.6, 0.5, p.w * 2 + 1.2), 0xc0c4ca, p.x, p.y - 0.3, 0);
+      rib.rotation.z = Math.atan2(q.y - p.y, q.x - p.x);
+      g.add(rib);
     }
-    for (const x of [-30, 30]) g.add(box(3, 5, 30, WHITE, x, 0, 0));
   },
   hemisferic: (g) => {
-    // L'Hemisfèric, the "eye of knowledge": an elongated shell of concrete ribs over the IMAX iris, with the
-    // folding glass eyelid, doubled by its reflection in the shallow pond.
-    g.add(box(64, 0.3, 44, 0x4cc9f0, 0, 0, 0, false));
-    const shell = mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), WHITE, 0, 0.3, 0);
-    shell.scale.set(26, 12, 13);
-    g.add(shell);
-    const reflection = mesh(new THREE.SphereGeometry(1, 20, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0x9fd8ea, 0, 0.31, 0);
-    reflection.scale.set(26, -3, 13);
-    g.add(reflection);
-    const lid = mesh(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI, 0, Math.PI / 2), GLASS, 0, 0.4, 5, 0x103040);
-    lid.scale.set(22, 9, 10);
-    lid.rotation.y = -Math.PI / 2;
-    g.add(lid);
-    for (let i = -5; i <= 5; i++) {
-      const x = i * 3.8;
-      const hgt = 9 * Math.sqrt(Math.max(0, 1 - (x / 22) ** 2));
-      g.add(rod(new THREE.Vector3(x, 0.4, 13.5), new THREE.Vector3(x * 0.9, hgt + 0.3, 5), 0.18, WHITE));
-    }
-    g.add(mesh(new THREE.SphereGeometry(5, 14, 10), 0xf4a261, 0, 5, 6));
+    // L'Hemisfèric (110 × 55 × 26 m, here at ~1:2.2), the "eye of knowledge": an almond-shaped shell with pointed
+    // tips on its plinth in the pond. The back and crown are a ribbed concrete brow; the front is the eyelid, long
+    // aluminium louvres hinged on the crown beam that fan open to show the iris, the IMAX dome, against the dark
+    // interior. Its reflection in the shallow pond closes the eye.
+    const L = 25;
+    const W = 12.5;
+    const H = 11.7;
+    const B = 1.3;
+    const hinge = 1.25;
+    const eye = (t: number, th: number, out: THREE.Vector3, grow = 1): THREE.Vector3 => {
+      const f = 1 - t * t;
+      return out.set(L * t, B + H * grow * Math.pow(f, 0.6) * Math.sin(th), W * grow * f * Math.cos(th));
+    };
+    /** Flat almond band between `inner` and `outer` (both times 1 - t², the tips' taper), `sx` long. */
+    const outline = (sx: number, outer: number, inner: number): THREE.Shape => {
+      const shape = new THREE.Shape();
+      shape.moveTo(-sx, 0);
+      for (let i = 1; i <= 24; i++) {
+        const t = -1 + (i / 24) * 2;
+        shape.lineTo(sx * t, outer * (1 - t * t));
+      }
+      for (let i = 23; i > 0; i--) {
+        const t = -1 + (i / 24) * 2;
+        shape.lineTo(sx * t, inner * (1 - t * t));
+      }
+      return shape;
+    };
+    g.add(box(70, 0.3, 50, 0x4cc9f0, 0, 0, 0, false));
     g.add(box(4, 0.6, 22, 0xd8d8d0, 0, 0, 22, false));
+    // Plinth (the Carl Sagan ring around the building).
+    const plinth = mesh(
+      new THREE.ExtrudeGeometry(outline(L * 1.08, W * 1.08, -W * 1.08), { depth: B, bevelEnabled: false }),
+      0xd8d8d0,
+      0,
+      0,
+      0,
+    );
+    plinth.rotation.x = -Math.PI / 2;
+    g.add(plinth);
+    // The reflection of the shell on the water in front, completing the eye.
+    const reflection = mesh(new THREE.ShapeGeometry(outline(L * 1.08, W * 1.08 + 7, W * 1.08)), 0xbfe6f2, 0, 0.32, 0);
+    reflection.material = toon(0xbfe6f2, { side: THREE.DoubleSide });
+    reflection.rotation.x = Math.PI / 2;
+    g.add(reflection);
+    // Dark interior and the iris.
+    const inside = mesh(new THREE.ShapeGeometry(outline(L * 0.96, H * 0.97, 0)), 0x14213d, 0, B, -0.5);
+    inside.material = toon(0x14213d, { side: THREE.DoubleSide });
+    g.add(inside);
+    g.add(mesh(new THREE.SphereGeometry(5.5, 18, 12), 0xdfe4e8, 0, B + 5.4, 3));
+    g.add(mesh(new THREE.TorusGeometry(5.6, 0.25, 4, 24), 0x9aa5ad, 0, B + 5.4, 3.2));
+    // Brow: the concrete back and crown of the shell, with its transverse ribs and the crown beam.
+    const brow = surface(28, 10, (u, v, out) => eye(u * 2 - 1, hinge + v * (Math.PI - hinge), out));
+    const browMesh = new THREE.Mesh(brow, toon(WHITE, { side: THREE.DoubleSide }));
+    browMesh.castShadow = true;
+    g.add(browMesh);
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    for (let t = -0.8; t <= 0.81; t += 0.16) {
+      for (let i = 0; i < 5; i++) {
+        const th0 = hinge + (i / 5) * (Math.PI - hinge);
+        const th1 = hinge + ((i + 1) / 5) * (Math.PI - hinge);
+        g.add(rod(eye(t, th0, a, 1.03).clone(), eye(t, th1, b, 1.03).clone(), 0.22, WHITE));
+      }
+    }
+    for (let i = 0; i < 16; i++) {
+      const t0 = -0.94 + (i / 16) * 1.88;
+      const t1 = -0.94 + ((i + 1) / 16) * 1.88;
+      g.add(rod(eye(t0, hinge, a, 1.02).clone(), eye(t1, hinge, b, 1.02).clone(), 0.4, WHITE));
+    }
+    // Eyelid: louvres hinged on the crown beam, fanned open (the lowest ones lifted the most).
+    const louvres = 6;
+    const lidMat = toon(0xd6dde2, { side: THREE.DoubleSide });
+    const p = new THREE.Vector3();
+    for (let k = 0; k < louvres; k++) {
+      const open = 0.08 + 0.3 * (1 - k / louvres);
+      const ca = Math.cos(open);
+      const sa = Math.sin(open);
+      const geo = surface(24, 2, (u, v, out) => {
+        const t = u * 2 - 1;
+        eye(t, hinge, p);
+        eye(t, (hinge * (k + v)) / louvres, out);
+        const dy = out.y - p.y;
+        const dz = out.z - p.z;
+        out.y = p.y + dy * ca + dz * sa;
+        out.z = p.z - dy * sa + dz * ca;
+      });
+      g.add(new THREE.Mesh(geo, lidMat));
+    }
   },
   museuCiencies: (g) => {
-    // Museu de les Ciències: 220 m of white concrete "whale skeleton": tree-like pillars along the glazed north
-    // front, a stepped roof of five ribbed bays and the closed south façade.
-    g.add(box(88, 20, 20, WHITE, 0, 0, -6));
-    for (let k = 0; k < 5; k++) g.add(box(16, 5 - (k % 2) * 2, 20, 0xeaeaea, -34 + k * 17, 20, -6));
-    g.add(mesh(new THREE.BoxGeometry(84, 18, 1), GLASS, 0, 11, 5, 0x0b2a3a));
-    for (let x = -42; x <= 42; x += 6) {
-      // Tree pillar: a trunk that branches into two arms holding the roof.
-      g.add(rod(new THREE.Vector3(x, 0, 11), new THREE.Vector3(x, 12, 9), 0.9, WHITE));
-      g.add(rod(new THREE.Vector3(x, 12, 9), new THREE.Vector3(x - 2.6, 24, 4), 0.6, WHITE));
-      g.add(rod(new THREE.Vector3(x, 12, 9), new THREE.Vector3(x + 2.6, 24, 4), 0.6, WHITE));
+    // Museu de les Ciències Príncipe Felipe (220 × 80 × 41 m, here at ~1:2.4), the "whale skeleton": the glazed,
+    // slightly leaning north front behind a pointed arcade of white branching tree pillars that hold the roof
+    // canopy, the sawtooth crown of skylights, the stepped east and west ends and the closed south façade combed
+    // with ribs, all on a plinth by its long pond.
+    g.add(box(94, 1.5, 38, 0xd8d8d0, 0, 0, -2));
+    g.add(box(90, 0.3, 8, 0x4cc9f0, 0, 0, 21, false));
+    g.add(box(76, 17, 30, WHITE, 0, 1.5, -4));
+    for (const s of [-1, 1]) {
+      g.add(box(5, 11, 26, 0xeaeaea, s * 40.5, 1.5, -4));
+      g.add(box(4, 6, 22, WHITE, s * 45, 1.5, -4));
     }
-    g.add(box(90, 1.2, 4, WHITE, 0, 24, 3));
+    const glass = mesh(new THREE.BoxGeometry(76, 16, 0.6), GLASS, 0, 9.5, 12.5, 0x0b2a3a);
+    glass.rotation.x = -0.12;
+    g.add(glass);
+    for (const y of [6.5, 11.5]) g.add(box(76, 0.5, 1.2, WHITE, 0, y, 13.1 - (y - 9.5) * 0.12, false));
+    for (let x = -37.5; x <= 37.5; x += 5) {
+      // Tree pillar: a trunk branching into two arms that meet the neighbours' in pointed arches under the canopy.
+      g.add(rod(new THREE.Vector3(x, 1.5, 15.5), new THREE.Vector3(x, 8, 14.6), 0.7, WHITE));
+      for (const s of [-1, 1]) {
+        g.add(rod(new THREE.Vector3(x, 8, 14.6), new THREE.Vector3(x + s * 2.5, 17.5, 13.2), 0.45, WHITE));
+      }
+      const tooth = mesh(new THREE.BoxGeometry(2.6, 2.6, 28), 0xeeeeee, x, 18.5, -4);
+      tooth.rotation.z = Math.PI / 4;
+      g.add(tooth);
+    }
+    g.add(box(80, 1, 5, WHITE, 0, 17.5, 12));
+    g.add(mesh(new THREE.BoxGeometry(76, 12, 0.4), GLASS, 0, 8, -19.3, 0x0b2a3a));
+    for (let x = -38; x <= 38; x += 4) {
+      g.add(rod(new THREE.Vector3(x, 1.5, -19.8), new THREE.Vector3(x, 19.5, -17.5), 0.6, WHITE));
+    }
   },
   umbracle: (g) => {
     // L'Umbracle: a landscaped walkway under 55 fixed white arches and the floating arches above them, planted with
