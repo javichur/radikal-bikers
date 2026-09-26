@@ -23,6 +23,7 @@ const RELOADED_KEY = 'rr.reloadedFor';
 export class UpdateChecker {
   private pending: string | null = null;
   private checking = false;
+  private recheckQueued = false;
 
   constructor(private readonly opts: UpdateCheckerOptions) {}
 
@@ -31,7 +32,10 @@ export class UpdateChecker {
   }
 
   async check(): Promise<void> {
-    if (this.checking) return;
+    if (this.checking) {
+      this.recheckQueued = true;
+      return;
+    }
     this.checking = true;
     try {
       const remote = await this.opts.fetchVersion();
@@ -42,6 +46,10 @@ export class UpdateChecker {
       // Network errors are ignored; we'll retry on the next resume.
     } finally {
       this.checking = false;
+      if (this.recheckQueued) {
+        this.recheckQueued = false;
+        void this.check();
+      }
     }
   }
 

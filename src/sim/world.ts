@@ -1,10 +1,21 @@
 import { Rng } from '../core/rng';
 import type { RunSummary } from '../content/challenges';
 import { CHARACTERS, type CharacterDef } from '../content/characters';
+import { OBSTACLES, type ObstacleKind } from '../content/obstacles';
 import type { StageDef } from '../content/stages';
+import { VEHICLES } from '../content/vehicles';
 import type { ControlState } from '../input/types';
 import { wrapAngle } from '../core/math';
 import { BIKE, canHop, crashBike, hopBike, createBike, landBike, launchBike, stepBike, type BikeState } from './bike';
+import {
+  BARRIER_HEIGHT,
+  BARRIER_OFFSET,
+  crossingState,
+  RAIL_HALF_WIDTH,
+  TRAIN_HEIGHT,
+  trainOnRoad,
+  type CrossingState,
+} from './crossing';
 import { addTrick, bankCombo, breakCombo, createCombo, stepCombo, TRICK_POINTS, type ComboState } from './combo';
 import type { SimEvent } from './events';
 import { GhostRecorder } from './ghost';
@@ -21,7 +32,7 @@ import { createRival, stepRival, type RivalState } from './rival';
 import { buildCones, CONE_RADIUS, laneClosed, pickWorkZones, type Cone, type WorkZone } from './roadworks';
 import { buildRoute, ROUTE_HALF_WIDTH, routeToMainS, type Route } from './shortcuts';
 import { Track } from './track';
-import { overlaps, Traffic, type Vehicle } from './traffic';
+import { overlaps, Traffic, type Box, type Vehicle } from './traffic';
 
 export interface Ramp {
   readonly s: number;
@@ -39,7 +50,27 @@ export interface Pickup {
   respawn: number;
 }
 
+/** Fixed obstacle on the main road. */
+export interface ObstacleState {
+  readonly kind: ObstacleKind;
+  readonly s: number;
+  readonly d: number;
+  /** Knocked over (cones) or smashed by the explosive bonus (fences). */
+  knocked: boolean;
+}
+
+/** Level crossing on the main road. */
+export interface Crossing {
+  readonly s: number;
+  readonly period: number;
+  readonly offset: number;
+}
+
 const BUMP_SPEED = 4;
+/** Speed kept after ploughing through a line of cones. */
+const CONES_SPEED_KEEP = 0.8;
+/** Distance within which the crossing bells are heard. */
+const BELL_DISTANCE = 400;
 export const PICKUP_RADIUS = 1.6;
 export const PICKUP_RESPAWN = 25;
 /** Base points for every vehicle blown up (before the combo multiplier). */
@@ -80,6 +111,8 @@ export class World {
   readonly traffic: Traffic;
   readonly routes: readonly Route[];
   readonly pickups: readonly Pickup[];
+  readonly obstacles: readonly ObstacleState[];
+  readonly crossings: readonly Crossing[];
   readonly zones: readonly WorkZone[];
   readonly cones: readonly Cone[];
   readonly rival: RivalState | null;
@@ -102,6 +135,8 @@ export class World {
   private readonly touched = new Set<number>();
   private wheelieRun = 0;
   private airtime = 0;
+  /** Simulation clock (also runs during the countdown): drives the train timetable. */
+  time = 0;
   /** Vertical speed of the road under the grounded bike (detects crests). */
   private roadVy = 0;
 
@@ -120,6 +155,17 @@ export class World {
       d: p.d,
       respawn: 0,
     }));
+    this.obstacles = (stage.obstacles ?? []).map((o) => ({
+      kind: o.kind,
+      s: o.at * this.track.length,
+      d: o.d,
+      knocked: false,
+    }));
+    this.crossings = (stage.crossings ?? []).map((c) => ({
+      s: c.at * this.track.length,
+      period: c.period,
+      offset: c.offset,
+    }));
     this.zones = pickWorkZones(stage, this.track.length, seed);
     this.cones = buildCones(this.zones);
     this.bike = createBike(5, stage.lanes.forward[0] ?? 0);
@@ -135,6 +181,8 @@ export class World {
         forwardLanes: stage.lanes.forward,
         oncomingLanes: stage.lanes.oncoming,
         density: stage.trafficDensity,
+        mix: stage.trafficMix,
+        oncomingSpeedScale: stage.oncomingSpeedScale,
         laneClosed: (s, d, margin) => laneClosed(this.zones, s, d, margin),
       },
       new Rng(seed),
@@ -150,6 +198,8 @@ export class World {
     const events: SimEvent[] = [];
     const b = this.bike;
     const prevS = b.s;
+    const wasClosed = this.crossings.map((_, i) => this.crossingAt(i).closed);
+    this.time += dt;
     const finished = this.race.finished || this.race.timeUp;
     const controls: ControlState =
       raceRunning && !finished ? input : { steer: 0, throttle: 0, brake: finished ? 1 : 0, wheelie: false };
@@ -157,6 +207,9 @@ export class World {
     const track = this.currentTrack;
     const here = track.sample(b.s);
     const prevY = here.y;
+    // Road vertical speed used by stepBike for an airborne bike (not while tumbling after a crash).
+    const ahead = b.speed * Math.cos(b.yaw);
+    const airRoadVy = b.airborne && b.crashTimer <= 0 ? ahead * track.sample(b.s + ahead * dt).slope : 0;
     stepBike(
       b,
       controls,
@@ -166,11 +219,12 @@ export class World {
         roadHalfWidth: this.roadHalfWidth,
         slope: here.slope,
         openSide: this.openSideAt(b.s),
+        roadVy: airRoadVy,
       },
       dt,
       events,
     );
-    this.followRoad(track, prevY, dt, events);
+    this.followRoad(track, prevY, airRoadVy, dt, events);
 
     if (b.route < 0) {
       for (const r of this.ramps) {
@@ -184,9 +238,19 @@ export class World {
     this.updatePickups(dt, events);
 
     const onMain = b.route < 0;
-    this.traffic.update(this.mainS, onMain ? b.d : Infinity, b.speed, dt, events);
+    const states = this.crossings.map((_, i) => this.crossingAt(i));
+    states.forEach((st, i) => {
+      const c = this.crossings[i]!;
+      if (st.closed && !wasClosed[i] && Math.abs(c.s - this.mainS) < BELL_DISTANCE) {
+        events.push({ type: 'crossingBell', index: i });
+      }
+    });
+    const closedS = this.crossings.filter((_, i) => states[i]!.closed).map((c) => c.s);
+    this.traffic.update(this.mainS, onMain ? b.d : Infinity, b.speed, dt, events, closedS);
     if (onMain) {
       this.resolveTrafficCollisions(events);
+      this.resolveObstacles(events);
+      this.resolveCrossings(states, events);
       this.detectNearMisses(events);
       this.hitCones(events);
     }
@@ -349,11 +413,12 @@ export class World {
   }
 
   /** Hills: the road rising or falling under an airborne bike, and take-off over sharp crests. */
-  private followRoad(track: Track, prevY: number, dt: number, events: SimEvent[]): void {
+  private followRoad(track: Track, prevY: number, predictedVy: number, dt: number, events: SimEvent[]): void {
     const b = this.bike;
     const p = track.sample(b.s);
     if (b.airborne) {
-      b.height -= p.y - prevY;
+      // stepBike already accounted for the road moving at `predictedVy`; correct for the actual rise or fall.
+      b.height -= p.y - prevY - predictedVy * dt;
       if (b.height <= 0) {
         if (b.crashTimer > 0) {
           b.height = 0;
@@ -430,13 +495,54 @@ export class World {
     }
   }
 
+  private get bikeBox(): Box {
+    const b = this.bike;
+    return { s: b.s, d: b.d, halfLength: BIKE.length / 2, halfWidth: BIKE.width / 2 };
+  }
+
+  /**
+   * Rigid contact with a box on the main road moving at `speed` (along the road): side swipes bounce the rider off,
+   * slow rear-end contacts push him back, anything harder knocks him down. Returns true when the rider went down.
+   */
+  private bump(o: Box, speed: number, cause: 'vehicle' | 'obstacle', events: SimEvent[]): boolean {
+    const b = this.bike;
+    const bikeBox = this.bikeBox;
+    const penS = bikeBox.halfLength + o.halfLength - Math.abs(b.s - o.s);
+    const penD = bikeBox.halfWidth + o.halfWidth - Math.abs(b.d - o.d);
+    const sideS = Math.sign(o.s - b.s) || 1;
+    const sideD = Math.sign(b.d - o.d) || 1;
+    if (penD < penS) {
+      // Side swipe: bounce off sideways, crash only if slamming into it.
+      const lateral = -b.speed * Math.sin(b.yaw) * sideD;
+      if (lateral > BIKE.wallCrashLateralSpeed) {
+        crashBike(b, cause, events);
+        return true;
+      }
+      b.d = o.d + sideD * (o.halfWidth + bikeBox.halfWidth + 0.05);
+      if (lateral > 0) b.yaw *= -0.3;
+      b.speed *= 0.97;
+      events.push({ type: 'scrape' });
+      return false;
+    }
+    const closing = (b.speed * Math.cos(b.yaw) - speed) * sideS;
+    if (closing > BUMP_SPEED) {
+      crashBike(b, cause, events);
+      return true;
+    }
+    // Gentle rear-end nudge: match speed and back off.
+    b.speed = Math.max(0, speed);
+    b.s = o.s - sideS * (o.halfLength + bikeBox.halfLength + 0.05);
+    events.push({ type: 'scrape' });
+    return false;
+  }
+
   private resolveTrafficCollisions(events: SimEvent[]): void {
     const b = this.bike;
     if (b.crashTimer > 0 || b.invulnerable > 0) {
       b.hopOver = -1;
       return;
     }
-    const bikeBox = { s: b.s, d: b.d, halfLength: BIKE.length / 2, halfWidth: BIKE.width / 2 };
+    const bikeBox = this.bikeBox;
     const vehicles = this.traffic.vehicles;
     let hopping = false;
     for (let i = vehicles.length - 1; i >= 0; i--) {
@@ -454,12 +560,16 @@ export class World {
       }
       if (b.height > v.height) continue; // jumped over it!
       if (!overlaps(bikeBox, vBox)) continue;
-      if (b.explosive > 0) {
+      if (b.explosive > 0 && !VEHICLES[v.kind].indestructible) {
         // Explosive bonus: the vehicle blows up and the rider ploughs on.
         vehicles.splice(i, 1);
         b.speed *= 0.9;
         events.push({ type: 'explode', vehicleId: v.id, s: v.s, d: v.d });
         continue;
+      }
+      if (b.explosive > 0 && VEHICLES[v.kind].indestructible) {
+        crashBike(b, 'vehicle', events, true);
+        return;
       }
       const penS = bikeBox.halfLength + vBox.halfLength - Math.abs(b.s - v.s);
       const penD = bikeBox.halfWidth + vBox.halfWidth - Math.abs(b.d - v.d);
@@ -499,6 +609,54 @@ export class World {
     if (!hopping) b.hopOver = -1;
   }
 
+  private resolveObstacles(events: SimEvent[]): void {
+    const b = this.bike;
+    if (b.crashTimer > 0 || b.invulnerable > 0) return;
+    for (let i = 0; i < this.obstacles.length; i++) {
+      const o = this.obstacles[i]!;
+      const def = OBSTACLES[o.kind];
+      if (o.knocked || b.height > def.height) continue;
+      const box = { s: o.s, d: o.d, halfLength: def.halfLength, halfWidth: def.halfWidth };
+      if (!overlaps(this.bikeBox, box)) continue;
+      if (!def.solid || (b.explosive > 0 && !def.indestructible)) {
+        o.knocked = true;
+        b.speed *= CONES_SPEED_KEEP;
+        events.push({ type: 'knock', index: i });
+        continue;
+      }
+      if (this.bump(box, 0, 'obstacle', events)) return;
+    }
+  }
+
+  /** State of level crossing `i` right now. */
+  crossingAt(i: number, time = this.time): CrossingState {
+    const c = this.crossings[i]!;
+    return crossingState(c.period, c.offset, time);
+  }
+
+  private resolveCrossings(states: readonly CrossingState[], events: SimEvent[]): void {
+    const b = this.bike;
+    if (b.crashTimer > 0 || b.invulnerable > 0) return;
+    const hw = this.stage.roadHalfWidth;
+    for (let i = 0; i < states.length; i++) {
+      const st = states[i]!;
+      if (!st.closed) continue;
+      const c = this.crossings[i]!;
+      if (trainOnRoad(st, hw) && b.height < TRAIN_HEIGHT) {
+        const train = { s: c.s, d: 0, halfLength: RAIL_HALF_WIDTH, halfWidth: hw + 1 };
+        if (overlaps(this.bikeBox, train)) {
+          crashBike(b, 'obstacle', events);
+          return;
+        }
+      }
+      if (st.arm < 0.5 || b.height > BARRIER_HEIGHT) continue;
+      for (const k of [-1, 1]) {
+        const barrier = { s: c.s + k * BARRIER_OFFSET, d: 0, halfLength: 0.15, halfWidth: hw + 1 };
+        if (overlaps(this.bikeBox, barrier) && this.bump(barrier, 0, 'obstacle', events)) return;
+      }
+    }
+  }
+
   /** After a crash, drop the rider on a lane that's free of traffic. */
   private placeSafely(): void {
     const b = this.bike;
@@ -506,6 +664,11 @@ export class World {
       b.d = 0;
       return;
     }
+    // Never back on the rails while the barriers are down.
+    this.crossings.forEach((c, i) => {
+      const near = b.s > c.s - BARRIER_OFFSET - 1 && b.s < c.s + BARRIER_OFFSET + 1;
+      if (near && this.crossingAt(i).closed) b.s = c.s - BARRIER_OFFSET - 3;
+    });
     const lanes = [...this.stage.lanes.forward, ...this.stage.lanes.oncoming];
     const isFree = (d: number): boolean =>
       !this.traffic.vehicles.some((v: Vehicle) => Math.abs(v.d - d) < 2.5 && Math.abs(v.s - b.s) < 25);

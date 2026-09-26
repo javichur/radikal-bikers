@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../../src/content/characters';
-import { STAGES } from '../../src/content/stages';
+import { getStage } from '../../src/content/stages';
 import { FIXED_DT } from '../../src/core/loop';
 import { BIKE } from '../../src/sim/bike';
 import type { SimEvent } from '../../src/sim/events';
@@ -10,7 +10,7 @@ import { profileHeight, Track } from '../../src/sim/track';
 import { EXPLODE_POINTS, World } from '../../src/sim/world';
 import { controls, run } from './helpers';
 
-const stage = STAGES[0]!;
+const stage = getStage('harbor');
 const newWorld = (): World => {
   const w = new World(stage, CHARACTERS[0]!);
   w.traffic.vehicles.length = 0;

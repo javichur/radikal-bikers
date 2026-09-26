@@ -38,7 +38,8 @@ export interface ScreenContext {
   readonly soundOn: boolean;
   readonly bestScore: number | null;
   readonly result: ResultInfo | null;
-  readonly stageLength: number;
+  /** Course length of every stage, metres (same order as STAGES). */
+  readonly stageLengths: readonly number[];
   readonly isTouch: boolean;
   readonly profile: Readonly<Profile>;
   readonly totalStars: number;
@@ -60,6 +61,7 @@ export interface ScreenCallbacks {
   toggleSound(): void;
 }
 
+const MAX_DIFFICULTY = 5;
 export const challengeLabel = (i18n: I18n, c: ChallengeDef): string =>
   i18n.t(`challenge.${c.kind}` as MessageKey, { n: c.target });
 
@@ -241,8 +243,14 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
           h('h2', {}, i18n.tk(s.nameKey)),
           h('p', { class: 'stars' }, starsText(stars, s.challenges.length)),
           locked ? h('p', { class: 'lock' }, `🔒 ${t('stage.locked', { n: s.unlockStars })}`) : null,
+          h(
+            'p',
+            { class: 'meta difficulty', title: `${t('stage.difficulty')}: ${s.difficulty}/${MAX_DIFFICULTY}` },
+            `${t('stage.difficulty')}: `,
+            h('span', { class: 'stars' }, '★'.repeat(s.difficulty) + '☆'.repeat(MAX_DIFFICULTY - s.difficulty)),
+          ),
           h('p', { class: 'bio' }, i18n.tk(s.descriptionKey)),
-          h('p', { class: 'meta' }, `${t('stage.length')}: ${(ctx.stageLength / 1000).toFixed(1)} km`),
+          h('p', { class: 'meta' }, `${t('stage.length')}: ${((ctx.stageLengths[i] ?? 0) / 1000).toFixed(1)} km`),
           h('p', { class: 'meta' }, `${t('stage.checkpoints')}: ${s.checkpoints.length}`),
           h(
             'p',
@@ -259,7 +267,7 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
           'div',
           { class: 'panel select-screen' },
           h('h1', { class: 'screen-title' }, t('select.stage')),
-          h('div', { class: 'cards' }, ...cards),
+          h('div', { class: 'cards stage-cards' }, ...cards),
           h(
             'div',
             { class: 'actions' },

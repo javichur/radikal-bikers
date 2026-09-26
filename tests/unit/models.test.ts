@@ -4,7 +4,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../../src/content/characters';
 import { STAGES } from '../../src/content/stages';
 import { buildBike, solveTwoBone } from '../../src/render/bikeModel';
+import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
+import { obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
+import { buildVehicle } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
 
 beforeAll(() => {
@@ -45,12 +48,41 @@ describe('bike model', () => {
 });
 
 describe('city builder', () => {
-  it('creates a mesh per shop window and per explosive crate', () => {
-    const world = new World(STAGES[0]!, CHARACTERS[0]!);
-    const city = buildCity(world);
-    expect(city.panes).toHaveLength(world.routes.length);
-    world.routes.forEach((r, i) => expect(city.panes[i]).toHaveLength(r.panes.length));
-    expect(city.pickups).toHaveLength(world.pickups.length);
-    expect(city.root.children.length).toBeGreaterThan(20);
+  it.each(STAGES.map((s) => [s.id, s] as const))(
+    '%s: creates a mesh per shop window, explosive crate, obstacle and level crossing',
+    (_id, stage) => {
+      const world = new World(stage, CHARACTERS[0]!);
+      const city = buildCity(world);
+      expect(city.panes).toHaveLength(world.routes.length);
+      world.routes.forEach((r, i) => expect(city.panes[i]).toHaveLength(r.panes.length));
+      expect(city.pickups).toHaveLength(world.pickups.length);
+      expect(city.obstacles).toHaveLength(world.obstacles.length);
+      expect(city.crossings).toHaveLength(world.crossings.length);
+      for (const c of city.crossings) expect(c.hinges).toHaveLength(2);
+      expect(city.root.children.length).toBeGreaterThan(20);
+    },
+  );
+
+  it('poses knocked-over obstacles and stands them back up', () => {
+    for (const kind of ['cones', 'barrier', 'fountain'] as const) {
+      const g = obstacleModel(kind);
+      const before = g.clone(true);
+      poseObstacle(kind, g, true);
+      if (kind !== 'fountain') expect(JSON.stringify(g.toJSON())).not.toBe(JSON.stringify(before.toJSON()));
+      poseObstacle(kind, g, false);
+      g.updateMatrixWorld(true);
+      before.updateMatrixWorld(true);
+      g.children.forEach((c, i) => expect(c.matrixWorld.equals(before.children[i]!.matrixWorld)).toBe(true));
+    }
+  });
+
+  it('builds every traffic vehicle kind', () => {
+    for (const kind of VEHICLE_KINDS) {
+      const g = buildVehicle(kind, 1);
+      const box = new THREE.Box3().setFromObject(g);
+      const size = box.getSize(new THREE.Vector3());
+      expect(size.z).toBeGreaterThan(VEHICLES[kind].length * 0.9);
+      expect(size.z).toBeLessThan(VEHICLES[kind].length * 1.1);
+    }
   });
 });

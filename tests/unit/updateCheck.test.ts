@@ -84,15 +84,43 @@ describe('UpdateChecker', () => {
     checker.onScreen(state.screen);
     expect(reload).toHaveBeenCalledTimes(1);
 
-    const next = new UpdateChecker({
+    const latest = setup('v3', 'title', storage);
+    await latest.checker.check();
+    expect(latest.reload).not.toHaveBeenCalled();
+  });
+
+  it('queues a follow-up check when another check is requested mid-flight', async () => {
+    let resolveFirst!: (value: string | null) => void;
+    let calls = 0;
+    const state = { screen: 'racing' as Screen };
+    const reload = vi.fn();
+    const storage = memory();
+    const checker = new UpdateChecker({
       current: 'v1',
-      fetchVersion: () => Promise.resolve('v3'),
-      getScreen: () => 'title',
-      reload: vi.fn(),
+      fetchVersion: () =>
+        calls++ === 0
+          ? new Promise<string | null>((resolve) => {
+              resolveFirst = resolve;
+            })
+          : Promise.resolve('v3'),
+      getScreen: () => state.screen,
+      reload,
       storage,
     });
-    await next.check();
-    expect(next.updatePending).toBe(false);
+
+    const first = checker.check();
+    await checker.check();
+    resolveFirst('v2');
+    await first;
+    await vi.waitFor(() => expect(calls).toBe(2));
+
+    state.screen = 'title';
+    checker.onScreen(state.screen);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    const latest = setup('v3', 'title', storage);
+    await latest.checker.check();
+    expect(latest.reload).not.toHaveBeenCalled();
   });
 });
 

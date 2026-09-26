@@ -16,12 +16,14 @@ import { comboMultiplier } from './sim/combo';
 import type { SimEvent } from './sim/events';
 import { ghostPose, type GhostData } from './sim/ghost';
 import { routeToMainS } from './sim/shortcuts';
+import { Track } from './sim/track';
 import { EXPLODE_POINTS, RIVAL_POINTS, World } from './sim/world';
 import { Hud } from './ui/hud';
 import { detectLocale, I18n, type MessageKey } from './ui/i18n';
 import { renderScreen, type ResultInfo } from './ui/screens';
 
 const RACE_SCREENS: readonly Screen[] = ['countdown', 'racing', 'paused', 'continue'];
+const STAGE_LENGTHS = STAGES.map((s) => new Track(s.controlPoints, 1, s.profile).length);
 /** Brief slow motion (time scale, real seconds) on near misses and jumps. */
 const SLOWMO_NEAR_MISS = { scale: 0.45, time: 0.22 } as const;
 const SLOWMO_JUMP = { scale: 0.6, time: 0.3 } as const;
@@ -230,6 +232,11 @@ export class Game {
 
   private onScreen(s: Screen): void {
     this.updates?.onScreen(s);
+    if (s === 'stageSelect' && this.world.stage.id !== STAGES[this.flow.stageIndex]!.id) {
+      // Preview the highlighted stage behind the cards.
+      this.world = this.previewWorld();
+      this.renderer.setWorld(this.world);
+    }
     if (s === 'characterSelect') {
       const c = this.paintedCharacter(this.flow.characterIndex);
       if (this.world.character.id !== c.id || this.world.character.colors.body !== c.colors.body) {
@@ -259,7 +266,7 @@ export class Game {
         soundOn: this.save.settings.sound,
         bestScore: this.save.best(key)?.score ?? null,
         result: this.result,
-        stageLength: this.world.track.length,
+        stageLengths: STAGE_LENGTHS,
         isTouch: this.isTouch,
         profile: this.save.profile,
         totalStars: this.totalStars(),
@@ -493,6 +500,9 @@ export class Game {
       case 'shortcut':
         if (this.save.discover(this.world.stage.id, e.route)) this.hud.flash(t('hud.newShortcut'), 1.6, 'bonus');
         else this.hud.flash(t('hud.shortcut'), 1.2, 'checkpoint');
+        break;
+      case 'crossingBell':
+        this.hud.flash(t('hud.train'), 1.6, 'danger');
         break;
       case 'finish':
         this.result = this.finishResult(true);

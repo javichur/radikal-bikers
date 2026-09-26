@@ -11,17 +11,37 @@ export const roadTexture = (
   halfWidth: number,
   forward: readonly number[],
   oncoming: readonly number[],
+  opts: { readonly cobbles?: boolean; readonly rails?: readonly number[] } = {},
 ): THREE.Texture => {
   const W = 512;
   const H = 256;
   const tex = canvasTexture(W, H, (c) => {
-    c.fillStyle = '#3b3f4a';
+    c.fillStyle = opts.cobbles ? '#6b6258' : '#3b3f4a';
     c.fillRect(0, 0, W, H);
+    const x = (d: number): number => ((d + halfWidth) / (halfWidth * 2)) * W;
+    if (opts.cobbles) {
+      // Setts in staggered rows.
+      for (let row = 0; row < H / 8; row++) {
+        for (let col = -1; col < W / 12; col++) {
+          const l = 38 + Math.random() * 14;
+          c.fillStyle = `hsl(30, 10%, ${l}%)`;
+          c.fillRect(col * 12 + (row % 2) * 6 + 1, row * 8 + 1, 10, 6);
+        }
+      }
+    }
     for (let i = 0; i < 900; i++) {
       c.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
       c.fillRect(Math.random() * W, Math.random() * H, 2, 2);
     }
-    const x = (d: number): number => ((d + halfWidth) / (halfWidth * 2)) * W;
+    // Tram tracks: a pair of steel rails (standard gauge) along each lane that has them.
+    for (const lane of opts.rails ?? []) {
+      for (const k of [-0.72, 0.72]) {
+        c.fillStyle = '#2b2b2b';
+        c.fillRect(x(lane + k) - 4, 0, 8, H);
+        c.fillStyle = '#b8b8b8';
+        c.fillRect(x(lane + k) - 1.5, 0, 3, H);
+      }
+    }
     c.fillStyle = '#f1f1f1';
     c.fillRect(x(-halfWidth + 0.3), 0, 6, H);
     c.fillRect(x(halfWidth - 0.3) - 6, 0, 6, H);
@@ -42,6 +62,40 @@ export const roadTexture = (
   tex.wrapT = THREE.RepeatWrapping;
   return tex;
 };
+
+/** Corrugated metal cladding of a warehouse, with a roller door band at the bottom. */
+export const shedTexture = (): THREE.Texture =>
+  repeat(
+    canvasTexture(128, 128, (c) => {
+      c.fillStyle = '#f2f2f2';
+      c.fillRect(0, 0, 128, 128);
+      for (let x = 0; x < 128; x += 8) {
+        c.fillStyle = 'rgba(0,0,0,0.12)';
+        c.fillRect(x, 0, 3, 128);
+      }
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(0, 100, 128, 3);
+      c.fillStyle = 'rgba(40,60,90,0.45)';
+      c.fillRect(8, 12, 112, 10);
+    }),
+  );
+
+/** Country track: packed earth with wheel ruts and pebbles. */
+export const dirtTexture = (): THREE.Texture =>
+  repeat(
+    canvasTexture(128, 256, (c) => {
+      c.fillStyle = '#9c7a52';
+      c.fillRect(0, 0, 128, 256);
+      for (let i = 0; i < 500; i++) {
+        c.fillStyle = `rgba(${Math.random() < 0.5 ? '255,240,210' : '60,40,20'},${0.1 + Math.random() * 0.2})`;
+        c.fillRect(Math.random() * 128, Math.random() * 256, 2 + Math.random() * 3, 2 + Math.random() * 3);
+      }
+      c.fillStyle = 'rgba(70,45,20,0.35)';
+      for (const x of [34, 88]) c.fillRect(x, 0, 8, 256);
+      c.fillStyle = 'rgba(110,150,70,0.5)';
+      c.fillRect(60, 0, 6, 256);
+    }),
+  );
 
 /** Narrow back-street asphalt with patches and a faded centre line. */
 export const alleyTexture = (): THREE.Texture =>
