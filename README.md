@@ -12,7 +12,7 @@ _Radikal Bikers_ (Gaelco, 1998). Todo el arte, el audio y el código son origina
 
 Reparte la pizza antes de que se acabe el tiempo. Cada **CHECKPOINT** suma tiempo extra. Esquiva coches, taxis,
 furgonetas, autobuses y camiones (en ambos sentidos), usa las rampas para saltar por encima del tráfico y haz
-**caballitos** para ganar velocidad punta (a costa de maniobrabilidad). Si se acaba el tiempo tienes 9 segundos para
+**caballitos** para ganar velocidad punta (a costa de maniobrabilidad) y saltar por encima de los vehículos que se crucen. Si se acaba el tiempo tienes 9 segundos para
 **continuar** desde el último checkpoint (con penalización de puntos).
 
 | Acción         | Teclado         | Mando                | Táctil (iPhone / Android)             |

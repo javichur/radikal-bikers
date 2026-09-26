@@ -21,7 +21,7 @@ src/
   partida (se verifica en los tests; permite repeticiones o _ghosts_ en el futuro).
 - **Espacio de pista.** La física trabaja en coordenadas `(s, d)`: distancia a lo largo de la carretera y desplazamiento
   lateral (positivo = derecha). La curvatura de la carretera rota la moto respecto a la calzada, así que hay que girar
-  en las curvas; los muros laterales rozan o provocan caída según el ángulo.
+  en las curvas; los muros laterales rozan o, si se choca de frente, frenan la moto (nunca provocan caída).
 - **Entrada abstracta.** Todos los dispositivos producen un `ControlState` (`steer`, `throttle`, `brake`, `wheelie`),
   que se combina con `combineControls`. Las acciones de menú son eventos (`MenuAction`).
 - **Flujo arcade explícito.** `GameFlow` es una máquina de estados sin dependencias:
@@ -38,10 +38,12 @@ src/
 | ------------ | ---------------------------------------------------------------------------------------------------------------- |
 | Aceleración  | `a = accel · throttle · (1 − (v/vmax)³)`; rozamiento al soltar; frenada fuerte y marcha atrás lenta              |
 | Dirección    | Velocidad de giro ∝ manejo, reducida a baja velocidad, con caballito (×0.45) y en el aire (×0.2)                 |
-| Caballito    | Requiere > 6 m/s; +12 % de velocidad punta; máximo 3 s y luego 1,5 s de enfriamiento                             |
+| Caballito    | Requiere > 6 m/s; +12 % de velocidad punta; máximo 3 s y luego 1,5 s de enfriamiento; puede saltar vehículos    |
 | Rampas       | Impulso vertical ∝ velocidad (+ extra con caballito); aterrizar muy cruzado provoca caída                        |
-| Muros        | Roce con pérdida de velocidad (menor cuanto más peso); impacto lateral > 9 m/s = caída                           |
-| Tráfico      | Choque frontal/alcance con velocidad relativa > 4 m/s = caída; roce lateral = rebote; se puede saltar por encima |
+| Muros        | Roce con pérdida de velocidad (menor cuanto más peso); impacto lateral > 9 m/s = rebote y −25 % de velocidad    |
+| Tráfico      | Choque frontal/alcance con velocidad relativa > 4 m/s = caída; con caballito la moto puede trepar y saltar      |
+| Explosivo    | Con el bonus activo, los vehículos golpeados explotan y el piloto no se cae                                     |
+| Escaparates  | Romper los cristales resta un 15 % de velocidad, sin caída                                                       |
 | Obstáculos   | Conos: se derriban y frenan; vallas, fuente y barreras bajadas: caída (se pueden saltar)                         |
 | Paso a nivel | Horario determinista (`sim/crossing.ts`); campana, barreras y tren que atropella; el tráfico espera              |
 | Crestas      | Si la aceleración vertical de la calzada supera la gravedad, la moto despega sin rampa                           |

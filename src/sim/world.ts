@@ -5,7 +5,7 @@ import type { StageDef } from '../content/stages';
 import { VEHICLES } from '../content/vehicles';
 import type { ControlState } from '../input/types';
 import { wrapAngle } from '../core/math';
-import { BIKE, crashBike, createBike, landBike, launchBike, stepBike, type BikeState } from './bike';
+import { BIKE, canHop, crashBike, hopBike, createBike, landBike, launchBike, stepBike, type BikeState } from './bike';
 import {
   BARRIER_HEIGHT,
   BARRIER_OFFSET,
@@ -351,13 +351,27 @@ export class World {
 
   private resolveTrafficCollisions(events: SimEvent[]): void {
     const b = this.bike;
-    if (b.crashTimer > 0 || b.invulnerable > 0) return;
+    if (b.crashTimer > 0 || b.invulnerable > 0) {
+      b.hopOver = -1;
+      return;
+    }
     const bikeBox = this.bikeBox;
     const vehicles = this.traffic.vehicles;
+    let hopping = false;
     for (let i = vehicles.length - 1; i >= 0; i--) {
       const v = vehicles[i]!;
-      if (b.height > v.height) continue; // jumped over it!
       const vBox = { s: v.s, d: v.d, halfLength: v.length / 2, halfWidth: v.width / 2 };
+      if (v.id === b.hopOver && overlaps(bikeBox, vBox)) {
+        // Wheelie hop in progress: keep the bike above the roof until it has cleared the vehicle.
+        hopping = true;
+        if (b.height <= v.height) {
+          b.height = v.height + 0.05;
+          b.vy = Math.max(0, b.vy);
+          b.airborne = true;
+        }
+        continue;
+      }
+      if (b.height > v.height) continue; // jumped over it!
       if (!overlaps(bikeBox, vBox)) continue;
       if (b.explosive > 0 && !VEHICLES[v.kind].indestructible) {
         // Explosive bonus: the vehicle blows up and the rider ploughs on.
@@ -367,8 +381,44 @@ export class World {
         events.push({ type: 'explode', vehicleId: v.id, s: v.s, d: v.d });
         continue;
       }
-      if (this.bump(vBox, v.speed * v.dir, 'vehicle', events)) return;
+      if (b.explosive > 0 && VEHICLES[v.kind].indestructible) {
+        crashBike(b, 'vehicle', events, true);
+        return;
+      }
+      const penS = bikeBox.halfLength + vBox.halfLength - Math.abs(b.s - v.s);
+      const penD = bikeBox.halfWidth + vBox.halfWidth - Math.abs(b.d - v.d);
+      const sideS = Math.sign(v.s - b.s) || 1;
+      const sideD = Math.sign(b.d - v.d) || 1;
+      if (penD < penS) {
+        // Side swipe: bounce off sideways, crash only if slamming into it.
+        const lateral = -b.speed * Math.sin(b.yaw) * sideD;
+        if (lateral > BIKE.wallCrashLateralSpeed) {
+          crashBike(b, 'vehicle', events);
+          return;
+        }
+        b.d = v.d + sideD * (vBox.halfWidth + bikeBox.halfWidth + 0.05);
+        if (lateral > 0) b.yaw *= -0.3;
+        b.speed *= 0.97;
+        events.push({ type: 'scrape' });
+        continue;
+      }
+      const closing = (b.speed * Math.cos(b.yaw) - v.speed * v.dir) * sideS;
+      if (closing > BUMP_SPEED && canHop(b)) {
+        // Riding a wheelie into a vehicle: the front wheel climbs it and the bike hops over.
+        hopBike(b, v.id, v.height, v.length + BIKE.length, closing, events);
+        hopping = true;
+        continue;
+      }
+      if (closing > BUMP_SPEED) {
+        crashBike(b, 'vehicle', events);
+        return;
+      }
+      // Gentle rear-end nudge: match speed and back off.
+      b.speed = Math.max(0, v.speed * v.dir);
+      b.s = v.s - sideS * (vBox.halfLength + bikeBox.halfLength + 0.05);
+      events.push({ type: 'scrape' });
     }
+    if (!hopping) b.hopOver = -1;
   }
 
   private resolveObstacles(events: SimEvent[]): void {
