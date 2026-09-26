@@ -285,6 +285,8 @@ export const STAGES: readonly StageDef[] = [
       { route: 4, at: 0.5, d: 0 },
       { route: 6, at: 0.5, d: 0 },
       { route: 8, at: 0.5, d: 0 },
+      { route: -1, at: 0.39, d: -3, kind: 'turbo' },
+      { route: -1, at: 0.735, d: 3, kind: 'turbo' },
     ],
     obstacles: [
       { at: 0.2802, d: 0, kind: 'cones' },
