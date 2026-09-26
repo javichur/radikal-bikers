@@ -46,6 +46,15 @@ describe('UpdateChecker', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it('clears a pending update once reload is requested', async () => {
+    const { checker, reload } = setup('v2', 'racing');
+    await checker.check();
+    checker.onScreen('title');
+    checker.onScreen('stageSelect');
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(checker.updatePending).toBe(false);
+  });
+
   it('does not reload twice for the same version (stale page guard)', async () => {
     const first = setup('v2');
     await first.checker.check();
@@ -53,6 +62,37 @@ describe('UpdateChecker', () => {
     const second = setup('v2', 'title', first.storage);
     await second.checker.check();
     expect(second.reload).not.toHaveBeenCalled();
+  });
+
+  it('replaces a pending version when a newer deploy is detected before reloading', async () => {
+    let remote: string | null = 'v2';
+    const storage = memory();
+    const state: { screen: Screen } = { screen: 'racing' };
+    const reload = vi.fn();
+    const checker = new UpdateChecker({
+      current: 'v1',
+      fetchVersion: () => Promise.resolve(remote),
+      getScreen: () => state.screen,
+      reload,
+      storage,
+    });
+    await checker.check();
+    expect(checker.updatePending).toBe(true);
+    remote = 'v3';
+    await checker.check();
+    state.screen = 'title';
+    checker.onScreen(state.screen);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    const next = new UpdateChecker({
+      current: 'v1',
+      fetchVersion: () => Promise.resolve('v3'),
+      getScreen: () => 'title',
+      reload: vi.fn(),
+      storage,
+    });
+    await next.check();
+    expect(next.updatePending).toBe(false);
   });
 });
 
@@ -73,6 +113,13 @@ describe('fetchDeployedVersion', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }));
+    await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
+  });
+
+  it('returns null on fetch or JSON failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.reject(new Error('bad json')) }));
     await expect(fetchDeployedVersion('https://x.test/')).resolves.toBeNull();
   });
 });

@@ -4,9 +4,10 @@ import { getStage, STAGES } from '../../src/content/stages';
 import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 
 describe('content', () => {
-  it('has two distinct playable riders with normalised stats in range', () => {
-    expect(CHARACTERS).toHaveLength(2);
-    expect(new Set(CHARACTERS.map((c) => c.id)).size).toBe(2);
+  it('has distinct riders (two available from the start) with normalised stats in range', () => {
+    expect(CHARACTERS).toHaveLength(3);
+    expect(new Set(CHARACTERS.map((c) => c.id)).size).toBe(3);
+    expect(CHARACTERS.filter((c) => c.unlockStars === 0)).toHaveLength(2);
     for (const c of CHARACTERS) {
       for (const v of Object.values(normalisedStats(c.stats))) {
         expect(v).toBeGreaterThan(0);
