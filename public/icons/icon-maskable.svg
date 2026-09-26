@@ -5,13 +5,13 @@
       <stop offset="1" stop-color="#1d1b3a"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <g stroke="#4cc9f0" stroke-width="26" stroke-linecap="round">
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(51 51) scale(0.8)" stroke="#4cc9f0" stroke-width="26" stroke-linecap="round">
     <line x1="56" y1="210" x2="150" y2="210"/>
     <line x1="80" y1="276" x2="170" y2="276"/>
     <line x1="56" y1="342" x2="190" y2="342"/>
   </g>
-  <g transform="rotate(-12 300 270)">
+  <g transform="translate(51 51) scale(0.8) rotate(-12 300 270)">
     <path d="M170 150 L440 150 L305 440 Z" fill="#ffd166" stroke="#e63946" stroke-width="14" stroke-linejoin="round"/>
     <rect x="152" y="112" width="306" height="62" rx="31" fill="#f4a261" stroke="#9c4a1a" stroke-width="10"/>
     <circle cx="255" cy="222" r="30" fill="#e63946"/>
