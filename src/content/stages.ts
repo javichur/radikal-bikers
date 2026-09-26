@@ -150,7 +150,7 @@ const HARBOR: StageDef = {
   ],
   roadworksPerRace: 2,
   rival: 'rocco',
-  grades: { s: 80000, a: 65000, b: 50000 },
+  grades: { s: 75000, a: 60000, b: 45000 },
   challenges: [
     { kind: 'wheelieStreak', target: 2.5 },
     { kind: 'shortcuts', target: 2 },
@@ -176,7 +176,7 @@ const HARBOR_NIGHT: StageDef = {
   trafficDensity: 22,
   roadworksPerRace: 3,
   rival: 'nitro',
-  grades: { s: 90000, a: 72000, b: 55000 },
+  grades: { s: 80000, a: 65000, b: 50000 },
   challenges: [
     { kind: 'nearMiss', target: 12 },
     { kind: 'combo', target: 6 },

@@ -9,9 +9,13 @@ import { laneClosed, type WorkZone } from './roadworks';
 import { overlaps, type Vehicle } from './traffic';
 
 /** Rival lead (m) beyond which it eases off, and deficit beyond which it pushes harder (rubber band). */
-const EASE_LEAD = 70;
+const EASE_LEAD = 40;
 const PUSH_DEFICIT = 120;
+/** Top-speed factor in normal running, so a clean ride can beat it. */
+const PACE = 0.95;
 const LOOKAHEAD = 40;
+/** Speed (m/s) while squeezing past a vehicle it could not avoid. */
+const SQUEEZE_SPEED = 12;
 
 /** A computer-driven rider that races the player on the main road (versus mode). */
 export interface RivalState {
@@ -50,7 +54,9 @@ export interface RivalEnv {
 
 const blocked = (env: RivalEnv, b: BikeState, lane: number): boolean =>
   laneClosed(env.zones, b.s + LOOKAHEAD / 2, lane, LOOKAHEAD / 2) ||
-  env.vehicles.some((v) => Math.abs(v.d - lane) < 2.2 && v.s > b.s - 3 && v.s - b.s < LOOKAHEAD);
+  env.vehicles.some(
+    (v) => Math.abs(v.d - lane) < 2.2 && v.s > b.s - 3 && v.s - b.s < (v.dir < 0 ? LOOKAHEAD * 2 : LOOKAHEAD),
+  );
 
 /** Steers to a free lane at full throttle, easing off when far ahead of the player. */
 const drive = (r: RivalState, env: RivalEnv): { steer: number; throttle: number } => {
@@ -70,10 +76,8 @@ export const stepRival = (r: RivalState, env: RivalEnv, running: boolean, dt: nu
   const b = r.bike;
   const prevS = b.s;
   const own: SimEvent[] = [];
-  const stats: CharacterStats =
-    env.playerS - b.s > PUSH_DEFICIT
-      ? { ...r.character.stats, topSpeed: r.character.stats.topSpeed * 1.1 }
-      : r.character.stats;
+  const pace = env.playerS - b.s > PUSH_DEFICIT ? 1.1 : PACE;
+  const stats: CharacterStats = { ...r.character.stats, topSpeed: r.character.stats.topSpeed * pace };
   const input =
     running && !r.finished
       ? { ...drive(r, env), brake: 0, wheelie: false }
@@ -90,14 +94,17 @@ export const stepRival = (r: RivalState, env: RivalEnv, running: boolean, dt: nu
   for (const ramp of env.ramps) {
     if (prevS < ramp.s && b.s >= ramp.s && Math.abs(b.d - ramp.d) < ramp.width / 2) launchBike(b, own);
   }
-  // Traffic never knocks the rival down: it just gets stuck behind and looks for a gap.
+  // Traffic never knocks the rival down: it queues behind slower cars and squeezes past oncoming ones.
   const box = { s: b.s, d: b.d, halfLength: BIKE.length / 2, halfWidth: BIKE.width / 2 };
   for (const v of env.vehicles) {
     if (b.height > v.height) continue;
     if (!overlaps(box, { s: v.s, d: v.d, halfLength: v.length / 2, halfWidth: v.width / 2 })) continue;
-    const side = Math.sign(v.s - b.s) || 1;
-    b.s = v.s - side * (v.length / 2 + BIKE.length / 2 + 0.05);
-    b.speed = Math.min(b.speed, Math.max(0, v.speed * v.dir));
+    if (v.dir > 0 && v.s > b.s) {
+      b.s = v.s - (v.length / 2 + BIKE.length / 2 + 0.05);
+      b.speed = Math.min(b.speed, v.speed);
+    } else {
+      b.speed = Math.min(b.speed, SQUEEZE_SPEED);
+    }
   }
   if (running && !r.finished && b.s >= env.finishS) {
     r.finished = true;
