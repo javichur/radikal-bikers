@@ -9,8 +9,8 @@ import { buildBike, solveTwoBone } from '../../src/render/bikeModel';
 import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
 import { monumentModel } from '../../src/render/monuments';
-import { obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
-import { buildVehicle, flashBeacons } from '../../src/render/vehicleModel';
+import { LOOKS, obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
+import { buildVehicle, CONTACT_WIRE_HEIGHT, flashBeacons } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
 
 beforeAll(() => {
@@ -111,6 +111,25 @@ describe('city builder', () => {
       expect(size.z).toBeGreaterThan(VEHICLES[kind].length * 0.9);
       expect(size.z).toBeLessThan(VEHICLES[kind].length * 1.1);
     }
+  });
+
+  it('builds a detailed vintage tram whose trolley pole reaches the contact wire', () => {
+    const g = buildVehicle('tram', 1, false, 'vintage');
+    const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    expect(size.z).toBeGreaterThan(VEHICLES.tram.length * 0.9);
+    expect(size.z).toBeLessThan(VEHICLES.tram.length * 1.1);
+    expect(size.y).toBeCloseTo(CONTACT_WIRE_HEIGHT, 0);
+    expect(g.children.length).toBeGreaterThan(buildVehicle('tram', 1).children.length);
+  });
+
+  it('strings tram wires only over old town streets with trams', () => {
+    for (const stage of STAGES) {
+      const catenary = buildCity(new World(stage, CHARACTERS[0]!)).root.getObjectByName('catenary');
+      const expected = LOOKS[stage.scenery].catenary && (stage.trafficMix?.tram ?? 0) > 0;
+      expect(catenary !== undefined).toBe(expected);
+      if (catenary) expect(catenary.children).toHaveLength(2);
+    }
+    expect(STAGES.some((s) => s.scenery === 'oldtown' && LOOKS[s.scenery].catenary)).toBe(true);
   });
 
   it('lights up traffic vehicles only at night', () => {

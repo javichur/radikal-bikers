@@ -101,11 +101,94 @@ const cab = (g: THREE.Group, w: number, h: number, l: number, depth: number, col
   g.add(part(w, 0.22, 0.2, DARK, 0, base - 0.05, l / 2 + 0.05));
 };
 
+/** Height of the tram contact wire above the road (the trolley pole of vintage trams reaches it). */
+export const CONTACT_WIRE_HEIGHT = 5.6;
+
+/** Classic liveries (lower panels) of vintage trams; the window band and letterboard are cream. */
+const VINTAGE_LIVERIES = [0xf2b705, 0x8b1e2d, 0x2e6b4f];
+const CREAM = 0xf3e9d2;
+const VARNISH = 0x5a3a22;
+
+/**
+ * Vintage two-car tram set (motor car in front, trailer behind): panelled body with a varnished belt rail, a row of
+ * framed windows, a clerestory roof, a three-pane windscreen with destination board, a lifeguard, exposed wheels and a
+ * sprung trolley pole trailing up to the contact wire.
+ */
+const vintageTram = (g: THREE.Group, w: number, l: number, h: number, variant: number, night: boolean): void => {
+  const cabin = night ? LIT_WINDOWS : GLASS;
+  const livery = VINTAGE_LIVERIES[variant % VINTAGE_LIVERIES.length]!;
+  const gap = 0.6;
+  const cl = (l - gap) / 2;
+  const axles: number[] = [];
+  for (const dir of [1, -1] as const) {
+    const zc = dir * (cl / 2 + gap / 2);
+    const outer = zc + dir * (cl / 2);
+    axles.push(zc - cl * 0.3, zc + cl * 0.3);
+    // Underframe, lower panels with a varnished belt rail, window band, letterboard and a lower skirt line.
+    g.add(part(w * 0.9, 0.35, cl - 0.6, DARK, 0, 0.5, zc));
+    g.add(part(w, 1.1, cl, livery, 0, 1.2, zc));
+    g.add(part(w + 0.04, 0.08, cl + 0.02, VARNISH, 0, 0.7, zc));
+    g.add(part(w + 0.06, 0.12, cl + 0.04, VARNISH, 0, 1.8, zc));
+    g.add(part(w, 1.0, cl, CREAM, 0, 2.35, zc));
+    g.add(part(w + 0.02, 0.3, cl, livery, 0, 3.0, zc));
+    // Framed side windows: six per flank, each with an opening top light.
+    const n = 6;
+    const pitch = (cl - 1.4) / n;
+    for (let i = 0; i < n; i++) {
+      const z = zc - (cl - 1.4) / 2 + pitch * (i + 0.5);
+      for (const x of [-w / 2 - 0.02, w / 2 + 0.02]) {
+        g.add(part(0.05, 0.62, pitch * 0.78, cabin, x, 2.25, z));
+        g.add(part(0.05, 0.16, pitch * 0.78, cabin, x, 2.72, z));
+      }
+    }
+    // Entrance doors near the outer end, on both flanks.
+    for (const x of [-w / 2 - 0.03, w / 2 + 0.03]) g.add(part(0.05, 2.1, 0.9, VARNISH, x, 1.75, outer - dir * 0.75));
+    // Roof with overhanging eaves and a raised clerestory with small vent windows.
+    g.add(part(w + 0.14, 0.12, cl + 0.12, 0x5c5552, 0, 3.2, zc));
+    g.add(part(w * 0.5, 0.22, cl * 0.8, 0x6d6560, 0, 3.37, zc));
+    for (const x of [-w * 0.25 - 0.02, w * 0.25 + 0.02]) g.add(part(0.04, 0.1, cl * 0.72, cabin, x, 3.37, zc));
+    // End: three-pane windscreen, destination board and headlamp on the dash, or a gangway on the inner end.
+    const face = outer;
+    for (const x of [-w * 0.31, 0, w * 0.31]) g.add(part(w * 0.27, 0.8, 0.06, cabin, x, 2.35, face + dir * 0.03));
+    g.add(part(w * 0.62, 0.22, 0.07, 0xffffff, 0, 3.0, face + dir * 0.04));
+    const lamp = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.16, 0.12, 12),
+      toon(0xfff3b0, { emissive: night ? 0xfff3b0 : 0x665f30 }),
+    );
+    lamp.rotation.x = Math.PI / 2;
+    lamp.position.set(0, 1.35, face + dir * 0.06);
+    g.add(lamp);
+    // Lifeguard tray under the end platform.
+    g.add(part(w * 0.8, 0.12, 0.28, DARK, 0, 0.3, face - dir * 0.12));
+  }
+  // Coupler and bellows between the cars.
+  g.add(part(0.3, 0.18, gap + 0.4, DARK, 0, 0.8, 0));
+  g.add(part(w * 0.5, 1.9, gap, 0x3a3330, 0, 2.05, 0));
+  wheels(g, w * 0.85, l, 0.42, axles);
+  // Trolley pole on the motor car: sprung base on the roof, pole trailing back up to the wire, and its shoe.
+  const baseZ = cl / 2 + gap / 2 - 1.2;
+  const baseY = h - 0.02;
+  g.add(part(0.5, 0.18, 0.7, DARK, 0, baseY, baseZ));
+  const len = 4.6;
+  const rise = CONTACT_WIRE_HEIGHT - baseY;
+  const run = Math.sqrt(len * len - rise * rise);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, len, 6), toon(DARK));
+  pole.rotation.x = Math.atan2(-run, rise);
+  pole.position.set(0, baseY + rise / 2, baseZ - run / 2);
+  g.add(pole);
+  g.add(part(0.12, 0.1, 0.25, CHROME, 0, CONTACT_WIRE_HEIGHT - 0.05, baseZ - run));
+};
+
 /**
  * Stylised traffic vehicle facing +Z, origin at ground centre. At `night` the lamps shine, headlight beams and a red
- * tail glow are drawn on the road and buses and trams show lit windows.
+ * tail glow are drawn on the road and buses and trams show lit windows. `tramStyle` picks the modern or vintage tram.
  */
-export const buildVehicle = (kind: VehicleKind, variant: number, night = false): THREE.Group => {
+export const buildVehicle = (
+  kind: VehicleKind,
+  variant: number,
+  night = false,
+  tramStyle: 'modern' | 'vintage' = 'modern',
+): THREE.Group => {
   const def = VEHICLES[kind];
   const { width: w, length: l, height: h } = def;
   const g = new THREE.Group();
@@ -260,6 +343,10 @@ export const buildVehicle = (kind: VehicleKind, variant: number, night = false):
       break;
     }
     case 'tram': {
+      if (tramStyle === 'vintage') {
+        vintageTram(g, w, l, h, variant, night);
+        break;
+      }
       // Two-tone articulated tram with a pantograph.
       g.add(part(w, h * 0.35, l, 0xf4a261, 0, 0.3 + h * 0.18, 0));
       g.add(part(w + 0.02, h * 0.3, l * 0.96, cabin, 0, 0.3 + h * 0.5, 0));
