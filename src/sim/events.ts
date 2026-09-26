@@ -1,5 +1,5 @@
 export type SimEvent =
-  | { readonly type: 'crash'; readonly cause: 'wall' | 'vehicle' | 'landing' }
+  | { readonly type: 'crash'; readonly cause: 'vehicle' | 'landing' }
   | { readonly type: 'respawn' }
   | { readonly type: 'scrape' }
   | { readonly type: 'jump' }

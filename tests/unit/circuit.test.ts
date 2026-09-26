@@ -198,6 +198,24 @@ describe('shortcuts', () => {
     expect(crashesAtExit).toBe(0);
   });
 
+  it('never knocks the rider down when smashing windows, even riding in at an angle', () => {
+    const w = newWorld();
+    const i = w.routes.findIndex((r) => r.kind === 'shop');
+    const r = w.routes[i]!;
+    for (const [k, pane] of r.panes.entries()) {
+      pane.broken = false;
+      w.bike.route = i;
+      w.bike.s = pane.s - 1;
+      w.bike.d = k % 2 ? 1.5 : -1.5;
+      w.bike.yaw = k % 2 ? 0.9 : -0.9;
+      w.bike.speed = 35;
+      const events = run(w, 0.3, controls({ throttle: 1 }));
+      expect(events.some((e) => e.type === 'glass')).toBe(true);
+      expect(events.some((e) => e.type === 'crash')).toBe(false);
+    }
+    expect(w.bike.crashes).toBe(0);
+  });
+
   it('breaking a window costs some speed', () => {
     const w = newWorld();
     const i = w.routes.findIndex((r) => r.kind === 'shop');
@@ -254,6 +272,14 @@ describe('explosive bonus', () => {
     expect(events.some((e) => e.type === 'crash')).toBe(false);
     expect(w.traffic.vehicles.some((v) => v.id === 77)).toBe(false);
     expect(w.race.bonusPoints).toBe(EXPLODE_POINTS);
+
+    // Side swipes at full lean don't knock the rider down either.
+    w.traffic.vehicles.push({ ...bus(w.bike.s + 1, w.bike.d + 2), id: 78 });
+    w.bike.yaw = 1;
+    w.bike.speed = 30;
+    const swipe = run(w, 0.2, controls({ throttle: 1, steer: 1 }));
+    expect(swipe.some((e) => e.type === 'crash')).toBe(false);
+    expect(w.bike.crashes).toBe(0);
 
     run(w, BIKE.explosiveDuration, controls());
     expect(w.bike.explosive).toBe(0);

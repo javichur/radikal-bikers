@@ -116,13 +116,17 @@ describe('bike physics', () => {
     expect(b.d).toBeLessThanOrEqual(12 - BIKE.wallMargin);
   });
 
-  it('crashes into walls head-on', () => {
+  it('only slows down when hitting walls head-on, without falling off', () => {
     const b = createBike(0, 10);
     b.speed = 30;
     b.yaw = 1;
     const events = sim(b, 0.3);
-    expect(events).toContainEqual({ type: 'crash', cause: 'wall' });
-    expect(b.crashes).toBe(1);
+    expect(events.some((e) => e.type === 'crash')).toBe(false);
+    expect(events.some((e) => e.type === 'scrape')).toBe(true);
+    expect(b.crashes).toBe(0);
+    expect(b.speed).toBeLessThan(30);
+    expect(b.speed).toBeGreaterThan(10);
+    expect(b.d).toBeLessThanOrEqual(12 - BIKE.wallMargin);
   });
 
   it('recovers after a crash with temporary invulnerability', () => {
