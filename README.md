@@ -4,8 +4,9 @@ Juego arcade de carreras de motos de reparto de pizza para el navegador, inspira
 _Radikal Bikers_ (Gaelco, 1998). Todo el arte, el audio y el código son originales: los gráficos son 3D estilizados
 (_cel-shading_) generados por código y el sonido se sintetiza en tiempo real con Web Audio.
 
-> Primera iteración: modo arcade para 1 jugador, 1 recorrido (**Puerto Radikal**) y 2 repartidores (**Rocco** y **Luna**),
-> en español e inglés.
+> Modo arcade para 1 jugador, 5 recorridos ordenados por dificultad (**Paseo Marítimo**, **Puerto Radikal**,
+> **Centro Histórico**, **Zona Industrial** y **Carretera de la Colina**) y 2 repartidores (**Rocco** y **Luna**), en
+> español e inglés.
 
 ## Cómo jugar
 

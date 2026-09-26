@@ -66,6 +66,9 @@ test.describe('touch (iPhone)', () => {
     // First tap selects, second tap confirms.
     await page.locator('[data-character=rocco]').tap();
     await expect(screen(page)).toHaveAttribute('data-screen', 'stageSelect');
+    // The first tap selects a stage (the easiest one starts selected), a second one confirms it.
+    await page.locator('[data-stage=harbor]').tap();
+    await expect(page.locator('.card.selected')).toHaveAttribute('data-stage', 'harbor');
     await page.locator('[data-stage=harbor]').tap();
 
     await expect(page.locator('.touch-controls')).toBeVisible();

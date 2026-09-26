@@ -23,11 +23,33 @@ Puntuación: 10 puntos por metro + 1000 por segundo sobrante al llegar a meta �
 | Rocco     | 36 m/s (130 km/h) | 9 m/s²      | 1,55   | 1,2  | Rápido en recta, gira peor       |
 | Luna      | 33 m/s (119 km/h) | 11 m/s²     | 1,95   | 0,9  | Ágil, sale rápido, esquiva mejor |
 
-## Recorrido: Puerto Radikal
+## Recorridos
 
-~3,1 km de avenida de 4 carriles (2 por sentido) con curvas enlazadas, desniveles suaves, 3 checkpoints
-(+30 s, +28 s, +25 s; 40 s iniciales) y 4 rampas. Tráfico mixto en ambos sentidos: coches, taxis, furgonetas,
-autobuses y camiones, que frenan tras vehículos más lentos y pitan si les bloqueas.
+Como en otros arcades de Gaelco, los recorridos se eligen por dificultad (★ a ★★★★★) y los más difíciles son más
+largos. Todos transcurren de día en una ciudad costera de estilo italiano y sus alrededores.
+
+| Recorrido              | Dificultad | Longitud | Calzada                   | Tiempo inicial / checkpoints | Rasgos propios                                                                                              |
+| ---------------------- | ---------- | -------- | ------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Paseo Marítimo         | ★          | ~2,6 km  | 4 carriles                | 45 s / +22, +20, +18 s       | Avenida junto al mar, pocas curvas, 7 rampas, callejones hacia el paseo, palmeras y sombrillas              |
+| Puerto Radikal         | ★★         | ~3,1 km  | 4 carriles                | 40 s / +30, +28, +25 s       | Curvas enlazadas, puente sobre el río, túnel, atajos por tiendas y callejones                               |
+| Centro Histórico       | ★★★        | ~2,3 km  | 2 carriles, adoquines     | 40 s / +26, +24, +20 s       | Esquinas de 90°, soportales, fuente en la plaza, conos y vallas de obra, tranvía, 4 tiendas                 |
+| Zona Industrial        | ★★★★       | ~2,7 km  | 4 carriles                | 40 s / +26, +24, +20 s       | Paso a nivel con tren, tráfico pesado (camiones, autobuses), naves, contenedores y grúas, túnel             |
+| Carretera de la Colina | ★★★★★      | ~4,2 km  | 2 carriles, guardarraíles | 45 s / +34, +32, +28, +24 s  | Crestas que hacen saltar sin rampa, puente sobre el barranco, túnel largo, atajos de tierra, tráfico rápido |
+
+Obstáculos y peligros nuevos:
+
+- **Tranvía** (Centro Histórico): vehículo largo por raíles centrales, indestructible (ni los explosivos lo mueven);
+  se puede saltar desde una rampa.
+- **Obstáculos fijos**: los conos se derriban al pasar (frenan un poco); las vallas de obra y la fuente provocan caída.
+  Los explosivos rompen las vallas, pero no la fuente.
+- **Paso a nivel** (Zona Industrial): el tren pasa según un horario determinista; la campana y las luces avisan
+  antes de que bajen las barreras. Con las barreras bajadas el tráfico espera y, en el suelo, chocas contra ellas; la
+  rampa previa permite saltarlas, pero el tren sí te atropella.
+- **Crestas** (Carretera de la Colina): los cambios de rasante bruscos lanzan la moto por el aire.
+
+> Los datos del original se han recordado sin poder contrastarlos con fuentes externas; conviene revisarlos con un
+> vídeo _longplay_ o con MAME. Una variante de noche del casco antiguo queda pendiente hasta confirmar si existía
+> (en la recreativa no consta; quizá en la versión de PlayStation).
 
 ## HUD
 
@@ -36,8 +58,8 @@ analógico con km/h, avisos centrales (CHECKPOINT / TIEMPO EXTRA / ¡PORRAZO! / 
 
 ## Próximas iteraciones
 
-- Más recorridos (escenarios del original: ciudad, puerto, zona industrial, centro histórico…) y más repartidores.
-- Atajos, peatones, obstáculos en calzada (obras, conos), tranvía.
+- Más repartidores; variante nocturna del casco antiguo (solo si se confirma en el original).
+- Peatones.
 - Rivales (modo "versus" del original), repeticiones / _ghost_ gracias a la simulación determinista.
 - Opciones: dirección por inclinación (giroscopio, con permiso en iOS), aceleración automática, modo zurdo,
   reasignación de controles.
