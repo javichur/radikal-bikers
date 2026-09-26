@@ -1110,6 +1110,41 @@ body {
     font-size: 0.9rem;
     padding: 0.5rem 1.2rem;
   }
+
+  .panel {
+    gap: 0.4rem;
+  }
+
+  .logo {
+    font-size: clamp(2.2rem, 16vh, 7rem);
+  }
+
+  .screen-title {
+    font-size: 1.6rem;
+  }
+
+  .profile-stats,
+  .title-screen .hint,
+  .result .hint {
+    display: none;
+  }
+
+  .meta {
+    margin: 0.05rem 0;
+    font-size: 0.75rem;
+  }
+
+  .challenges {
+    font-size: 0.75rem;
+  }
+
+  .grade {
+    font-size: 3rem;
+  }
+
+  .result .score {
+    font-size: 1.4rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

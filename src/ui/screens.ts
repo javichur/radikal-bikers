@@ -346,7 +346,13 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
           r && r.levelAfter > r.levelBefore
             ? h('p', { class: 'level-up blink' }, t('result.levelUp', { l: r.levelAfter }))
             : null,
-          ...(r?.unlocked ?? []).map((k) => h('p', { class: 'unlocked' }, t('result.unlocked', { name: i18n.tk(k) }))),
+          r?.unlocked.length
+            ? h(
+                'p',
+                { class: 'unlocked' },
+                t('result.unlocked', { name: r.unlocked.map((k) => i18n.tk(k)).join(', ') }),
+              )
+            : null,
           h(
             'div',
             { class: 'actions' },
