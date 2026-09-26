@@ -5,7 +5,9 @@ import { BIKE } from '../sim/bike';
 import type { World } from '../sim/world';
 import { buildBike, BIKE_WHEEL_RADIUS, type BikeRig } from './bikeModel';
 import type { SimEvent } from '../sim/events';
+import { TRAIN_LENGTH } from '../sim/crossing';
 import { buildCity, type CityScene } from './cityBuilder';
+import { poseObstacle } from './sceneryStyle';
 import { Effects } from './effects';
 import { buildVehicle } from './vehicleModel';
 
@@ -123,6 +125,9 @@ export class GameRenderer {
         this.addShake(0.3);
         break;
       }
+      case 'knock':
+        this.addShake(0.25);
+        break;
       case 'pickup': {
         const b = world.bike;
         const p = world.currentTrack.toWorld(b.s, b.d);
@@ -224,6 +229,22 @@ export class GameRenderer {
       }
       const spark = g.getObjectByName('spark');
       if (spark) spark.scale.setScalar(0.8 + Math.abs(Math.sin(this.time * 14 + i)) * 0.6);
+    });
+    world.obstacles.forEach((o, i) => {
+      const g = city.obstacles[i];
+      if (g) poseObstacle(o.kind, g, o.knocked);
+    });
+    city.crossings.forEach((c, i) => {
+      const st = world.crossingAt(i);
+      for (const h of c.hinges) h.object.rotation.z = h.sign * (1 - st.arm) * (Math.PI / 2);
+      const blink = Math.floor(this.time * 3) % 2 === 0;
+      c.lamps.forEach((m, k) => {
+        const on = st.closed && blink === (k === 0);
+        m.color.setHex(on ? 0xff2222 : 0x550000);
+        m.emissive.setHex(on ? 0xaa0000 : 0x000000);
+      });
+      c.train.visible = st.trainHead !== null;
+      if (st.trainHead !== null) c.train.position.x = -st.trainHead + TRAIN_LENGTH / 2;
     });
   }
 

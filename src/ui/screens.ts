@@ -17,7 +17,8 @@ export interface ScreenContext {
   readonly soundOn: boolean;
   readonly bestScore: number | null;
   readonly result: ResultInfo | null;
-  readonly stageLength: number;
+  /** Course length of every stage, metres (same order as STAGES). */
+  readonly stageLengths: readonly number[];
   readonly isTouch: boolean;
 }
 
@@ -29,6 +30,8 @@ export interface ScreenCallbacks {
   toggleLocale(): void;
   toggleSound(): void;
 }
+
+const MAX_DIFFICULTY = 5;
 
 export const formatTime = (seconds: number): string => {
   const m = Math.floor(seconds / 60);
@@ -122,8 +125,14 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
             onclick: () => cb.selectStage(i),
           },
           h('h2', {}, i18n.tk(s.nameKey)),
+          h(
+            'p',
+            { class: 'meta difficulty', title: `${t('stage.difficulty')}: ${s.difficulty}/${MAX_DIFFICULTY}` },
+            `${t('stage.difficulty')}: `,
+            h('span', { class: 'stars' }, '★'.repeat(s.difficulty) + '☆'.repeat(MAX_DIFFICULTY - s.difficulty)),
+          ),
           h('p', { class: 'bio' }, i18n.tk(s.descriptionKey)),
-          h('p', { class: 'meta' }, `${t('stage.length')}: ${(ctx.stageLength / 1000).toFixed(1)} km`),
+          h('p', { class: 'meta' }, `${t('stage.length')}: ${((ctx.stageLengths[i] ?? 0) / 1000).toFixed(1)} km`),
           h('p', { class: 'meta' }, `${t('stage.checkpoints')}: ${s.checkpoints.length}`),
         ),
       );
@@ -132,7 +141,7 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
           'div',
           { class: 'panel select-screen' },
           h('h1', { class: 'screen-title' }, t('select.stage')),
-          h('div', { class: 'cards' }, ...cards),
+          h('div', { class: 'cards stage-cards' }, ...cards),
           h(
             'div',
             { class: 'actions' },

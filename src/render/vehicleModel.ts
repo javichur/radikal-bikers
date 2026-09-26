@@ -58,6 +58,35 @@ export const buildVehicle = (kind: VehicleKind, variant: number): THREE.Group =>
       g.add(part(w, h * 0.9, l - 2.5, 0xe9ecef, 0, 0.45 + h * 0.45, -1.2));
       wheels(g, w, l, 0.5);
       break;
+    case 'motocarro': {
+      // Three-wheeled Italian delivery van: tiny cab up front, open bed behind.
+      g.add(part(w, h * 0.62, 1.2, color, 0, 0.3 + h * 0.31, l / 2 - 0.6));
+      g.add(part(w * 0.9, h * 0.25, 0.08, GLASS, 0, 0.3 + h * 0.5, l / 2));
+      g.add(part(w, 0.45, l - 1.2, 0x8d99ae, 0, 0.55, -0.6));
+      const geo = new THREE.CylinderGeometry(0.28, 0.28, 0.2, 10);
+      geo.rotateZ(Math.PI / 2);
+      const mat = toon(0x1b1b1b);
+      for (const [x, z] of [
+        [0, l / 2 - 0.4],
+        [-w / 2 + 0.1, -l * 0.3],
+        [w / 2 - 0.1, -l * 0.3],
+      ] as const) {
+        const wheel = new THREE.Mesh(geo, mat);
+        wheel.position.set(x, 0.28, z);
+        g.add(wheel);
+      }
+      break;
+    }
+    case 'tram': {
+      // Two-tone articulated tram with a pantograph.
+      g.add(part(w, h * 0.35, l, 0xf4a261, 0, 0.3 + h * 0.18, 0));
+      g.add(part(w + 0.02, h * 0.3, l * 0.96, GLASS, 0, 0.3 + h * 0.5, 0));
+      g.add(part(w, h * 0.15, l, 0xfff1d0, 0, 0.3 + h * 0.72, 0));
+      g.add(part(1.4, 0.12, 0.12, 0x333333, 0, h + 0.6, 0));
+      g.add(part(0.08, 0.7, 0.08, 0x333333, 0, h + 0.3, 0));
+      for (const z of [-l / 2 + 2.5, 0, l / 2 - 2.5]) g.add(part(w * 0.9, 0.4, 2, 0x333333, 0, 0.2, z));
+      break;
+    }
   }
   // Tail/head lights.
   const lightGeo = new THREE.BoxGeometry(0.3, 0.15, 0.05);

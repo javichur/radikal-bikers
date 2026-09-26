@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng';
-import { inRiver, riverOf } from '../sim/scenery';
+import { DEFAULT_TRAFFIC_MIX } from '../content/vehicles';
+import { inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
 import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
 import type { World } from '../sim/world';
 import {
@@ -13,8 +14,17 @@ import {
   type Obstacle,
 } from './landmarks';
 import { toon, withOutline } from './materials';
-import { bannerTexture, roadTexture, stripeTexture, tntTexture, windowTexture } from './textures';
-import { inRanges, ribbon, segments, wall } from './trackGeometry';
+import {
+  buildCrossing,
+  buildSea,
+  LOOKS,
+  obstacleModel,
+  treeGeometries,
+  umbrellaModel,
+  type CrossingScene,
+} from './sceneryStyle';
+import { bannerTexture, roadTexture, shedTexture, stripeTexture, tntTexture, windowTexture } from './textures';
+import { inRanges, ribbon, segments, sweep, wall } from './trackGeometry';
 
 const ROAD_TEX_LENGTH = 16;
 
@@ -24,6 +34,10 @@ export interface CityScene {
   readonly panes: readonly (readonly THREE.Object3D[])[];
   /** Explosive boxes, in the same order as `world.pickups`. */
   readonly pickups: readonly THREE.Object3D[];
+  /** Road obstacles, in the same order as `world.obstacles`. */
+  readonly obstacles: readonly THREE.Object3D[];
+  /** Level crossings, in the same order as `world.crossings`. */
+  readonly crossings: readonly CrossingScene[];
 }
 
 const gate = (width: number, texture: THREE.Texture): THREE.Group => {
@@ -87,6 +101,8 @@ export const buildCity = (world: World): CityScene => {
   const root = new THREE.Group();
   root.name = 'city';
   const rng = new Rng(stage.seed);
+  const look = LOOKS[stage.scenery];
+  const mix = stage.trafficMix ?? DEFAULT_TRAFFIC_MIX;
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), toon(stage.theme.ground));
   ground.rotation.x = -Math.PI / 2;
@@ -96,19 +112,29 @@ export const buildCity = (world: World): CityScene => {
 
   const road = new THREE.Mesh(
     ribbon(track, -hw - 0.5, hw + 0.5, 0.02, 2, ROAD_TEX_LENGTH),
-    toon(0xffffff, { map: roadTexture(hw + 0.5, stage.lanes.forward, stage.lanes.oncoming) }),
+    toon(0xffffff, {
+      map: roadTexture(hw + 0.5, stage.lanes.forward, stage.lanes.oncoming, {
+        cobbles: look.cobbles,
+        rails: (mix.tram ?? 0) > 0 ? [...stage.lanes.forward, ...stage.lanes.oncoming] : [],
+      }),
+    }),
   );
   road.receiveShadow = true;
   root.add(road);
 
   const tunnels = stage.tunnels.map((r) => ({ from: r.from * L, to: r.to * L }));
   const spans = stage.bridges.map((r) => bridgeSpan(world, { from: r.from * L, to: r.to * L }));
-  const rivers = stage.bridges.map((b) => riverOf(track, b));
+  const rivers = [
+    ...stage.bridges.map((b) => riverOf(track, b)),
+    ...(stage.crossings ?? []).map((c) => railOf(track, c.at)),
+  ];
 
   // Sidewalks, curbs and embankments, with gaps where shortcuts branch off.
-  const walk = toon(0xd9d4c7);
-  const curb = toon(0xa8a39a);
+  const walk = toon(look.sidewalk);
+  const curb = toon(look.curb);
   const skirt = toon(0xb9b2a5, { side: THREE.DoubleSide });
+  const bank = toon(stage.theme.ground, { side: THREE.DoubleSide });
+  const rail = toon(0xc9ced4, { side: THREE.DoubleSide });
   for (const side of [-1, 1]) {
     const gaps = routes.filter((r) => r.side === side).flatMap((r) => r.mouths);
     const a = side * (hw + 0.5);
@@ -120,7 +146,25 @@ export const buildCity = (world: World): CityScene => {
       const c0 = side < 0 ? a - 0.3 : a;
       root.add(new THREE.Mesh(ribbon(track, c0, c0 + 0.3, 0.26, 2, 4, seg.from, seg.to), curb));
       for (const part of segments(seg.from, seg.to, spans)) {
-        root.add(new THREE.Mesh(wall(track, b, 0, 0.22, part.from, part.to, 2, 4, true), skirt));
+        if (look.guardrails) {
+          // Country road: grassy embankment sloping down from the shoulder.
+          const bankGeo = sweep(
+            track,
+            [side < 0 ? [b - 16, 0] : [b, 0.22], side < 0 ? [b, 0.22] : [b + 16, 0]],
+            part.from,
+            part.to,
+            2,
+            8,
+            side < 0 ? [true, false] : [false, true],
+          );
+          root.add(new THREE.Mesh(bankGeo, bank));
+        } else {
+          root.add(new THREE.Mesh(wall(track, b, 0, 0.22, part.from, part.to, 2, 4, true), skirt));
+        }
+      }
+      if (look.guardrails) {
+        const g0 = side * (hw + 0.5 + SIDEWALK - 0.3);
+        root.add(new THREE.Mesh(wall(track, g0, 0.5, 0.85, seg.from, seg.to, 2, 4), rail));
       }
     }
   }
@@ -129,23 +173,59 @@ export const buildCity = (world: World): CityScene => {
   const obstacles: Obstacle[] = [];
   const rows: BuildingRow[] = [];
   const panes = routes.map((r) => buildShortcut(world, r, root, obstacles, rows, rng));
-  tunnels.forEach((r) => buildTunnel(world, r, root, obstacles));
+  tunnels.forEach((r) => buildTunnel(world, r, root, obstacles, look.tunnel));
   spans.forEach((s) => buildBridge(world, s, root));
-  rivers.forEach((r) => buildRiver(r, root));
+  stage.bridges.forEach((b) => buildRiver(riverOf(track, b), root));
+  const crossings = world.crossings.map((c) => buildCrossing(track, c.s, hw, root));
+  if (stage.sea) buildSea(stage.sea, root);
+  const sea = stage.sea;
   for (let s = 0; s <= L; s += 6) {
     const p = track.toWorld(s, 0);
     obstacles.push({ x: p.x, z: p.z, r: hw + SIDEWALK + 0.3 });
   }
 
   // Buildings (instanced), only where the whole footprint is clear of roads, shops, tunnels and water.
-  const winTex = windowTexture();
+
   const bGeo = new THREE.BoxGeometry(1, 1, 1);
   bGeo.translate(0, 0.5, 0);
   const maxBuildings = Math.ceil(L / 8) * 2 + 400;
-  const buildings = new THREE.InstancedMesh(bGeo, toon(0xffffff, { map: winTex }), maxBuildings);
+  const buildings = new THREE.InstancedMesh(
+    bGeo,
+    toon(0xffffff, { map: look.sheds ? shedTexture() : windowTexture() }),
+    maxBuildings,
+  );
   buildings.castShadow = true;
   buildings.receiveShadow = true;
-  const roofs = new THREE.InstancedMesh(bGeo, toon(0x6c757d), maxBuildings);
+  const roofs = new THREE.InstancedMesh(bGeo, toon(look.roof), maxBuildings);
+  const containerGeo = new THREE.BoxGeometry(2.5, 2.6, 12);
+  containerGeo.translate(0, 1.3, 0);
+  const maxContainers = look.containers ? 600 : 0;
+  const containers = new THREE.InstancedMesh(containerGeo, toon(0xffffff), Math.max(1, maxContainers));
+  containers.castShadow = true;
+  let containerCount = 0;
+  const CONTAINER_COLORS = [0xc8553d, 0x2a9d8f, 0x264653, 0xe9c46a, 0x3a86ff, 0x8d99ae];
+  /** Stacks of shipping containers filling a building plot. */
+  const placeContainers = (x: number, z: number, heading: number, w: number, depth: number): void => {
+    q.setFromAxisAngle(up, heading + Math.PI / 2);
+    const cols = Math.max(1, Math.floor(w / 2.8));
+    const rowsN = Math.max(1, Math.floor(depth / 12.5));
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rowsN; j++) {
+        const levels = rng.int(1, 3);
+        for (let k = 0; k < levels && containerCount < maxContainers; k++) {
+          const u = (i - (cols - 1) / 2) * 2.8;
+          const v = (j - (rowsN - 1) / 2) * 12.5;
+          const px = x + Math.sin(heading) * u + Math.cos(heading) * v;
+          const pz = z + Math.cos(heading) * u - Math.sin(heading) * v;
+          m.compose(new THREE.Vector3(px, -0.05 + k * 2.6, pz), q, new THREE.Vector3(1, 1, 1));
+          containers.setMatrixAt(containerCount, m);
+          color.setHex(rng.pick(CONTAINER_COLORS));
+          containers.setColorAt(containerCount, color);
+          containerCount++;
+        }
+      }
+    }
+  };
   const footprintClear = (x: number, z: number, h: number, w: number, depth: number): boolean => {
     const fx = Math.sin(h);
     const fz = Math.cos(h);
@@ -155,6 +235,7 @@ export const buildCity = (world: World): CityScene => {
     const reach = Math.hypot(w, depth) / 2;
     return (
       rivers.every((r) => !inRiver(r, x, z, reach + 3)) &&
+      (!sea || polygonDistance(sea, x, z) > reach + 25) &&
       obstacles.every((o) => {
         if (Math.abs(o.x - x) > o.r + reach || Math.abs(o.z - z) > o.r + reach) return true;
         return pts.every(([px, pz]) => Math.hypot(px - o.x, pz - o.z) > o.r);
@@ -174,12 +255,14 @@ export const buildCity = (world: World): CityScene => {
     const side = Math.sign(row.offset);
     let s = row.from;
     while (s < row.to && count < maxBuildings) {
-      const w = rng.range(10, 20);
-      const depth = rng.range(10, 18);
+      const w = rng.range(look.buildingWidth[0], look.buildingWidth[1]);
+      const depth = rng.range(look.buildingDepth[0], look.buildingDepth[1]);
       const h = rng.range(row.minHeight, row.maxHeight);
       const sc = Math.min(Math.max(s + w / 2, 0), t.length);
       const p = t.toWorld(sc, row.offset + side * (depth / 2));
-      if (footprintClear(p.x, p.z, p.heading, w, depth)) {
+      if (look.containers && footprintClear(p.x, p.z, p.heading, w, depth) && rng.next() < 0.3) {
+        placeContainers(p.x, p.z, p.heading, w, depth);
+      } else if (footprintClear(p.x, p.z, p.heading, w, depth)) {
         const top = h + Math.max(0, p.y);
         q.setFromAxisAngle(up, p.heading);
         m.compose(new THREE.Vector3(p.x, -0.05, p.z), q, new THREE.Vector3(w, top, depth));
@@ -190,7 +273,7 @@ export const buildCity = (world: World): CityScene => {
         roofs.setMatrixAt(count, m);
         count++;
       }
-      s += w + rng.range(1, 6);
+      s += w + rng.range(look.rowGap[0], look.rowGap[1]);
     }
   };
   const mouthsBySide = (side: number) => routes.filter((r) => r.side === side).flatMap((r) => r.mouths);
@@ -199,31 +282,31 @@ export const buildCity = (world: World): CityScene => {
       route: -1,
       from: -30,
       to: L + 30,
-      offset: side * (hw + SIDEWALK + FACADE_GAP),
-      minHeight: 9,
-      maxHeight: 42,
+      offset: side * (hw + SIDEWALK + FACADE_GAP + look.setback),
+      minHeight: look.mainHeight[0],
+      maxHeight: look.mainHeight[1],
     });
     const gaps = mouthsBySide(side);
     for (let s = 4; s < L; s += rng.range(9, 16)) {
       if (inRanges(s, gaps, 3) || inRanges(s, tunnels, 2)) continue;
       const onBridge = inRanges(s, spans);
-      if (rng.next() >= 0.6) continue;
+      if (rng.next() >= look.propChance) continue;
       const pp = track.toWorld(s, side * (hw + 2.8));
       const mat = new THREE.Matrix4().makeTranslation(pp.x, pp.y + 0.2, pp.z);
-      (!onBridge && rng.next() < 0.5 ? propsTrees : propsLamps).push(mat);
+      const tree = !onBridge && rng.next() < look.treeChance;
+      if (tree || !look.guardrails) (tree ? propsTrees : propsLamps).push(mat);
     }
   }
-  rows.forEach(placeRow);
+  rows.forEach((r) => placeRow({ ...r, minHeight: look.routeHeight[0], maxHeight: look.routeHeight[1] }));
   buildings.count = count;
   roofs.count = count;
   root.add(buildings, roofs);
+  containers.count = containerCount;
+  if (containerCount > 0) root.add(containers);
 
-  const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 2, 6);
-  trunkGeo.translate(0, 1, 0);
-  const crownGeo = new THREE.IcosahedronGeometry(1.4, 0);
-  crownGeo.translate(0, 3, 0);
+  const [trunkGeo, crownGeo, crownColor] = treeGeometries(look.tree);
   const trunks = new THREE.InstancedMesh(trunkGeo, toon(0x8d5524), propsTrees.length);
-  const crowns = new THREE.InstancedMesh(crownGeo, toon(0x52b788), propsTrees.length);
+  const crowns = new THREE.InstancedMesh(crownGeo, toon(crownColor), propsTrees.length);
   crowns.castShadow = true;
   propsTrees.forEach((mt, i) => {
     trunks.setMatrixAt(i, mt);
@@ -240,6 +323,59 @@ export const buildCity = (world: World): CityScene => {
     bulbs.setMatrixAt(i, mt);
   });
   root.add(trunks, crowns, poles, bulbs);
+
+  // Beach umbrellas on the sand between the road and the sea.
+  if (sea) {
+    const colors = [0xe63946, 0xffd166, 0x3a86ff, 0x06d6a0, 0xff70a6];
+    for (let s = 20; s < L; s += rng.range(14, 26)) {
+      for (const side of [-1, 1]) {
+        const away = hw + SIDEWALK + rng.range(8, 30);
+        const p = track.toWorld(s, side * away);
+        const dSea = polygonDistance(sea, p.x, p.z);
+        if (dSea < 4 || dSea > 24 || !footprintClear(p.x, p.z, 0, 2, 2)) continue;
+        const u = umbrellaModel(rng.pick(colors));
+        u.position.set(p.x, 0, p.z);
+        u.rotation.y = rng.range(0, Math.PI * 2);
+        root.add(u);
+      }
+    }
+  }
+
+  // Tower cranes over the industrial estate.
+  if (look.containers) {
+    const yellow = toon(0xffc300);
+    for (let s = 150, placed = 0; s < L && placed < 5; s += 70) {
+      const side = placed % 2 ? 1 : -1;
+      const p = track.toWorld(s, side * (hw + 45));
+      if (!footprintClear(p.x, p.z, 0, 4, 4)) continue;
+      const crane = new THREE.Group();
+      const mast = new THREE.Mesh(new THREE.BoxGeometry(1.6, 42, 1.6), yellow);
+      mast.position.y = 21;
+      const jib = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 38), yellow);
+      jib.position.set(0, 42, 10);
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2, 5), toon(0x495057));
+      counter.position.set(0, 41.5, -9);
+      const cable = new THREE.Mesh(new THREE.BoxGeometry(0.06, 16, 0.06), toon(0x222222));
+      cable.position.set(0, 34, 22);
+      mast.castShadow = true;
+      jib.castShadow = true;
+      crane.add(mast, jib, counter, cable);
+      crane.position.set(p.x, -0.05, p.z);
+      crane.rotation.y = rng.range(0, Math.PI * 2);
+      root.add(crane);
+      placed++;
+    }
+  }
+
+  // Road obstacles.
+  const obstacleModels = world.obstacles.map((o) => {
+    const g = obstacleModel(o.kind);
+    const p = track.toWorld(o.s, o.d);
+    g.position.set(p.x, p.y, p.z);
+    g.rotation.y = p.heading;
+    root.add(g);
+    return g;
+  });
 
   // Checkpoint gates + finish.
   const cpTex = bannerTexture('CHECKPOINT');
@@ -276,5 +412,5 @@ export const buildCity = (world: World): CityScene => {
     return g;
   });
 
-  return { root, panes, pickups };
+  return { root, panes, pickups, obstacles: obstacleModels, crossings };
 };

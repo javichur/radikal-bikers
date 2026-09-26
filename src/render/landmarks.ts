@@ -12,16 +12,19 @@ import {
 } from '../sim/shortcuts';
 import type { World } from '../sim/world';
 import { toon } from './materials';
+import { arcadeProfiles } from './sceneryStyle';
 import {
   alleyTexture,
   awningTexture,
   brickTexture,
   concreteTexture,
+  dirtTexture,
   shelfTexture,
   signTexture,
   stripeTexture,
   tileTexture,
   waterTexture,
+  windowTexture,
 } from './textures';
 import { rangesWhere, ribbon, segments, sweep, wall } from './trackGeometry';
 
@@ -200,7 +203,8 @@ export const buildShortcut = (
   const outside = rangesWhere(0, L, 1, (s) => latAt(s) > hw + 0.3);
   const from = Math.max(0, (outside[0]?.from ?? 0) - 1.5);
   const to = Math.min(L, (outside[outside.length - 1]?.to ?? L) + 1.5);
-  const asphalt = toon(0xffffff, { map: alleyTexture() });
+  const dirt = route.kind === 'dirt';
+  const asphalt = toon(0xffffff, { map: dirt ? dirtTexture() : alleyTexture() });
   const shopGaps = route.shops.map((r) => ({ from: r.from + 0.2, to: r.to - 0.2 }));
   for (const seg of segments(from, to, shopGaps)) {
     const m = new THREE.Mesh(ribbon(t, -ROUTE_HALF_WIDTH, ROUTE_HALF_WIDTH, 0.012, 1.5, 8, seg.from, seg.to), asphalt);
@@ -212,8 +216,23 @@ export const buildShortcut = (
     obstacles.push({ x: p.x, z: p.z, r: ROUTE_HALF_WIDTH + 1.4 });
   }
 
-  // Walkways and graffiti brick walls once the lane is behind the first row of buildings.
+  // Walkways and graffiti brick walls once the lane is behind the first row of buildings; wooden fences along a
+  // country dirt track.
   const start = route.kind === 'shop' ? e + SHOP_DEPTH + 0.3 : hw + SIDEWALK + 0.4;
+  if (dirt) {
+    const fence = toon(0x8d5524, { side: THREE.DoubleSide });
+    for (const seg of rangesWhere(0, L, 1, (s) => latAt(s) > start)) {
+      for (const k of [-1, 1]) {
+        for (const [y0, y1] of [
+          [0.45, 0.6],
+          [0.85, 1],
+        ] as const) {
+          root.add(new THREE.Mesh(wall(t, k * (ROUTE_HALF_WIDTH + 0.6), y0, y1, seg.from, seg.to, 2, 4), fence));
+        }
+      }
+    }
+    return [];
+  }
   const walkway = toon(0xbfb8ab);
   const bricks = toon(0xffffff, { map: brickTexture(), side: THREE.DoubleSide });
   for (const seg of rangesWhere(0, L, 1, (s) => latAt(s) > start)) {
@@ -245,18 +264,28 @@ export const buildShortcut = (
   return panes;
 };
 
-/** Covered section: arched concrete tube under a grassy hill, with portals and lights. */
-export const buildTunnel = (world: World, range: Range, root: THREE.Group, obstacles: Obstacle[]): void => {
+/**
+ * Covered section: arched concrete tube under a grassy hill (`hill`), or a portico — a building bridging the street
+ * with an arched passage (`arcade`) — with portals and lights.
+ */
+export const buildTunnel = (
+  world: World,
+  range: Range,
+  root: THREE.Group,
+  obstacles: Obstacle[],
+  style: 'hill' | 'arcade' = 'hill',
+): void => {
   const t = world.track;
   const W = world.stage.roadHalfWidth + SIDEWALK + 0.6;
-  const inner: [number, number][] = [[-W, -0.2]];
+  const arcade = style === 'arcade';
+  let inner: [number, number][] = [[-W, -0.2]];
   inner.push([-W, 4.2]);
   for (let k = 1; k < 8; k++) {
     const a = Math.PI - (k * Math.PI) / 8;
     inner.push([W * Math.cos(a), 4.2 + 3.8 * Math.sin(a)]);
   }
   inner.push([W, 4.2], [W, -0.2]);
-  const outer: [number, number][] = [
+  let outer: [number, number][] = [
     [-W - 18, -0.3],
     [-W - 8, 6],
     [-W - 1, 9.5],
@@ -265,13 +294,19 @@ export const buildTunnel = (world: World, range: Range, root: THREE.Group, obsta
     [W + 8, 6],
     [W + 18, -0.3],
   ];
+  if (arcade) ({ inner, outer } = arcadeProfiles(W));
   const shell = new THREE.Mesh(
     sweep(t, inner, range.from, range.to, 2, 6),
-    toon(0xd8cfc4, { map: concreteTexture(), side: THREE.DoubleSide }),
+    arcade
+      ? toon(0xf2cc8f, { side: THREE.DoubleSide })
+      : toon(0xd8cfc4, { map: concreteTexture(), side: THREE.DoubleSide }),
   );
   shell.castShadow = true;
   shell.receiveShadow = true;
-  const hill = new THREE.Mesh(sweep(t, outer, range.from, range.to, 3, 20), toon(0x6aa84f));
+  const hill = new THREE.Mesh(
+    sweep(t, outer, range.from, range.to, 3, 20),
+    arcade ? toon(0xe9b872, { map: windowTexture(), side: THREE.DoubleSide }) : toon(0x6aa84f),
+  );
   hill.castShadow = true;
   hill.receiveShadow = true;
   root.add(shell, hill);
@@ -281,7 +316,7 @@ export const buildTunnel = (world: World, range: Range, root: THREE.Group, obsta
   shape.holes.push(new THREE.Path([...inner].reverse().map(([x, y]) => new THREE.Vector2(x, y + 0.05))));
   const portalGeo = new THREE.ExtrudeGeometry(shape, { depth: 1.4, bevelEnabled: false });
   portalGeo.translate(0, 0, -0.7);
-  const portalMat = toon(0xa39b90, { map: concreteTexture() });
+  const portalMat = arcade ? toon(0xd98e5f) : toon(0xa39b90, { map: concreteTexture() });
   const bandGeo = new THREE.BoxGeometry(W * 1.6, 0.8, 1.6);
   const bandMat = toon(0xffffff, { map: stripeTexture() });
   for (const s of [range.from, range.to]) {
@@ -290,10 +325,12 @@ export const buildTunnel = (world: World, range: Range, root: THREE.Group, obsta
     portal.position.set(p.x, p.y, p.z);
     portal.rotation.y = p.heading;
     portal.castShadow = true;
+    root.add(portal);
+    if (arcade) continue;
     const band = new THREE.Mesh(bandGeo, bandMat);
     band.position.set(p.x, p.y + 8.6, p.z);
     band.rotation.y = p.heading;
-    root.add(portal, band);
+    root.add(band);
   }
 
   // Ceiling lights and glowing side strips.
@@ -306,7 +343,7 @@ export const buildTunnel = (world: World, range: Range, root: THREE.Group, obsta
   for (let i = 0; i < count; i++) {
     const p = t.toWorld(range.from + 5 + i * 10, 0);
     q.setFromAxisAngle(up, p.heading);
-    m.compose(new THREE.Vector3(p.x, p.y + 7.9, p.z), q, new THREE.Vector3(1, 1, 1));
+    m.compose(new THREE.Vector3(p.x, p.y + (arcade ? 7.5 : 7.9), p.z), q, new THREE.Vector3(1, 1, 1));
     lights.setMatrixAt(i, m);
   }
   lights.count = count;

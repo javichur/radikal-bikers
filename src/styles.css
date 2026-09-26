@@ -226,6 +226,30 @@ body {
   margin: 0 auto;
 }
 
+.stage-cards {
+  gap: 0.6rem;
+}
+
+.stage-cards .card {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+}
+
+.stage-cards .card h2 {
+  font-size: 1.25rem;
+}
+
+.stage-cards .bio {
+  font-size: 0.78rem;
+}
+
+.stars {
+  color: var(--red);
+  letter-spacing: 0.05em;
+}
+
 .bio,
 .meta {
   margin: 0.2rem 0 0.5rem;
@@ -680,6 +704,14 @@ body {
 @media (max-height: 500px) {
   .card {
     padding: 0.5rem 0.8rem;
+  }
+
+  .stage-cards .card h2 {
+    font-size: 1rem;
+  }
+
+  .stage-cards .bio {
+    display: none;
   }
 
   .card h2 {

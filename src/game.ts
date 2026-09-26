@@ -10,12 +10,14 @@ import { isTouchDevice, TouchInput } from './input/touch';
 import { combineControls, neutralControls, type MenuAction } from './input/types';
 import { GameRenderer } from './render/renderer';
 import type { SimEvent } from './sim/events';
+import { Track } from './sim/track';
 import { EXPLODE_POINTS, World } from './sim/world';
 import { Hud } from './ui/hud';
 import { detectLocale, I18n } from './ui/i18n';
 import { renderScreen, type ResultInfo } from './ui/screens';
 
 const RACE_SCREENS: readonly Screen[] = ['countdown', 'racing', 'paused', 'continue'];
+const STAGE_LENGTHS = STAGES.map((s) => new Track(s.controlPoints, 1, s.profile).length);
 
 /** Composition root: wires flow, simulation, rendering, input, audio and UI. */
 export class Game {
@@ -125,6 +127,11 @@ export class Game {
   }
 
   private onScreen(s: Screen): void {
+    if (s === 'stageSelect' && this.world.stage.id !== STAGES[this.flow.stageIndex]!.id) {
+      // Preview the highlighted stage behind the cards.
+      this.world = this.previewWorld();
+      this.renderer.setWorld(this.world);
+    }
     if (s === 'characterSelect') {
       const c = CHARACTERS[this.flow.characterIndex]!;
       if (this.world.character.id !== c.id) {
@@ -151,7 +158,7 @@ export class Game {
         soundOn: this.save.settings.sound,
         bestScore: this.save.best(key)?.score ?? null,
         result: this.result,
-        stageLength: this.world.track.length,
+        stageLengths: STAGE_LENGTHS,
         isTouch: this.isTouch,
       },
       {
@@ -259,6 +266,9 @@ export class Game {
         break;
       case 'shortcut':
         this.hud.flash(t('hud.shortcut'), 1.2, 'checkpoint');
+        break;
+      case 'crossingBell':
+        this.hud.flash(t('hud.train'), 1.6, 'danger');
         break;
       case 'finish':
         this.result = this.finishResult(true);

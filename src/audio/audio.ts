@@ -134,6 +134,14 @@ export class AudioEngine {
         this.tone(660, 0.12, 'triangle', 0.12);
         this.tone(990, 0.18, 'triangle', 0.1, 0.1);
         break;
+      case 'knock':
+        this.burst(0.15, 0.25);
+        this.tone(220, 0.08, 'triangle', 0.12);
+        break;
+      case 'crossingBell':
+        // Level crossing bells: a quick ding-ding repeated while the barriers come down.
+        for (let i = 0; i < 6; i++) this.tone(1250, 0.12, 'square', 0.07, i * 0.25);
+        break;
       case 'timeUp':
         [392, 330, 262].forEach((f, i) => this.tone(f, 0.3, 'square', 0.15, i * 0.25));
         break;
