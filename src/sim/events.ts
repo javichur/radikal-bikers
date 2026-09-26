@@ -9,4 +9,8 @@ export type SimEvent =
   | { readonly type: 'finish' }
   | { readonly type: 'timeUp' }
   | { readonly type: 'honk'; readonly vehicleId: number }
-  | { readonly type: 'hurryUp' };
+  | { readonly type: 'hurryUp' }
+  | { readonly type: 'pickup'; readonly kind: 'explosive' }
+  | { readonly type: 'explode'; readonly vehicleId: number; readonly s: number; readonly d: number }
+  | { readonly type: 'glass'; readonly route: number; readonly pane: number }
+  | { readonly type: 'shortcut'; readonly route: number };

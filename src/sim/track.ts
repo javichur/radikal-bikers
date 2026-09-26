@@ -9,9 +9,32 @@ export interface TrackSample {
   readonly heading: number;
   /** Signed curvature dh/ds (positive = road turns left). */
   readonly curvature: number;
+  /** Road gradient dy/ds (positive = uphill). */
+  readonly slope: number;
 }
 
 type Point3 = readonly [number, number, number];
+
+/** Elevation key: `at` is a fraction of the course length, `y` the road height there (metres). */
+export interface ProfileKey {
+  readonly at: number;
+  readonly y: number;
+}
+
+const smoothstep = (t: number): number => t * t * (3 - 2 * t);
+
+/** Smooth piecewise elevation (zero gradient at every key) sampled by course fraction. */
+export const profileHeight = (keys: readonly ProfileKey[], f: number): number => {
+  if (keys.length === 0) return 0;
+  const first = keys[0]!;
+  if (f <= first.at) return first.y;
+  for (let i = 1; i < keys.length; i++) {
+    const a = keys[i - 1]!;
+    const b = keys[i]!;
+    if (f <= b.at) return b.at > a.at ? lerp(a.y, b.y, smoothstep((f - a.at) / (b.at - a.at))) : b.y;
+  }
+  return keys[keys.length - 1]!.y;
+};
 
 const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
   const t2 = t * t;
@@ -31,8 +54,13 @@ export class Track {
   private readonly ys: Float64Array;
   private readonly hs: Float64Array;
   private readonly ks: Float64Array;
+  private readonly gs: Float64Array;
 
-  constructor(controlPoints: readonly Point3[], step = 1) {
+  /**
+   * @param profile optional elevation keys; when given they replace the control points' elevation, which lets a
+   *   stage describe hills, crests and bridges independently of the road layout.
+   */
+  constructor(controlPoints: readonly Point3[], step = 1, profile?: readonly ProfileKey[]) {
     if (controlPoints.length < 2) throw new Error('Track needs at least 2 control points');
     this.step = step;
 
@@ -83,7 +111,7 @@ export class Track {
       const b = dense[seg + 1]!;
       this.xs[i] = lerp(a[0], b[0], t);
       this.zs[i] = lerp(a[1], b[1], t);
-      this.ys[i] = lerp(a[2], b[2], t);
+      this.ys[i] = profile ? profileHeight(profile, s / this.length) : lerp(a[2], b[2], t);
     }
 
     // 4. Headings and (smoothed) curvature.
@@ -110,6 +138,12 @@ export class Track {
       }
       this.ks[i] = sum / cnt;
     }
+    this.gs = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const a = Math.max(0, i - 1);
+      const b = Math.min(n - 1, i + 1);
+      this.gs[i] = b > a ? (this.ys[b]! - this.ys[a]!) / ((b - a) * step) : 0;
+    }
   }
 
   sample(s: number): TrackSample {
@@ -124,7 +158,42 @@ export class Track {
       y: lerp(this.ys[i]!, this.ys[i + 1]!, t),
       heading: h0 + wrapAngle(h1 - h0) * t,
       curvature: lerp(this.ks[i]!, this.ks[i + 1]!, t),
+      slope: lerp(this.gs[i]!, this.gs[i + 1]!, t),
     };
+  }
+
+  /** Road elevation at distance s. */
+  heightAt(s: number): number {
+    const f = clamp(s, 0, this.length) / this.step;
+    const i = Math.min(Math.floor(f), this.ys.length - 2);
+    return lerp(this.ys[i]!, this.ys[i + 1]!, f - i);
+  }
+
+  /**
+   * Nearest track coordinates (s, d) of a world XZ point.
+   * @param hintS / radius restrict the search to [hintS - radius, hintS + radius] (whole course by default).
+   */
+  project(x: number, z: number, hintS = this.length / 2, radius = this.length): { s: number; d: number } {
+    const n = this.xs.length;
+    const i0 = clamp(Math.floor((hintS - radius) / this.step), 0, n - 1);
+    const i1 = clamp(Math.ceil((hintS + radius) / this.step), 0, n - 1);
+    let best = i0;
+    let bestD2 = Infinity;
+    for (let i = i0; i <= i1; i++) {
+      const dx = x - this.xs[i]!;
+      const dz = z - this.zs[i]!;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = i;
+      }
+    }
+    const h = this.hs[best]!;
+    const along = (x - this.xs[best]!) * Math.sin(h) + (z - this.zs[best]!) * Math.cos(h);
+    const s = clamp(best * this.step + along, 0, this.length);
+    const p = this.sample(s);
+    const d = (x - p.x) * -Math.cos(p.heading) + (z - p.z) * Math.sin(p.heading);
+    return { s, d };
   }
 
   /** Converts track coordinates (s, d) to world XZ + road elevation. */

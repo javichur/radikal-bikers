@@ -15,6 +15,8 @@ export interface RaceState {
   timeUp: boolean;
   hurryWarned: boolean;
   continues: number;
+  /** Extra points (e.g. vehicles blown up with the explosive bonus). */
+  bonusPoints: number;
 }
 
 export interface RaceRules {
@@ -38,6 +40,7 @@ export const createRace = (rules: RaceRules): RaceState => ({
   timeUp: false,
   hurryWarned: false,
   continues: 0,
+  bonusPoints: 0,
 });
 
 export const stepRace = (r: RaceState, rules: RaceRules, playerS: number, dt: number, events: SimEvent[]): void => {
@@ -78,10 +81,10 @@ export const continueRace = (r: RaceState, rules: RaceRules): void => {
   r.continues++;
 };
 
-/** Score: distance + time bonus; continues are penalised like the arcade. */
+/** Score: distance + time bonus + stunt bonus; continues are penalised like the arcade. */
 export const computeScore = (r: RaceState, playerS: number): number => {
   const distance = Math.floor(playerS) * 10;
   const timeBonus = r.finished ? Math.floor(r.timeLeft * 1000) : 0;
   const penalty = r.continues * 5000;
-  return Math.max(0, distance + timeBonus - penalty);
+  return Math.max(0, distance + timeBonus + r.bonusPoints - penalty);
 };

@@ -27,6 +27,10 @@ export const BIKE = {
   landingCrashYaw: 0.75,
   crashDuration: 2.2,
   invulnerableDuration: 1.6,
+  /** Fraction of gravity felt along the road gradient (arcade-friendly hills). */
+  slopeFactor: 0.45,
+  /** Seconds the explosive bonus lasts. */
+  explosiveDuration: 8,
 } as const;
 
 export interface BikeState {
@@ -50,6 +54,10 @@ export interface BikeState {
   crashTimer: number;
   invulnerable: number;
   crashes: number;
+  /** -1 on the main road, otherwise the index of the shortcut route the bike is on. */
+  route: number;
+  /** > 0 while the explosive bonus is active: vehicles hit blow up instead of knocking the rider down. */
+  explosive: number;
 }
 
 export const createBike = (s = 0, d = 3): BikeState => ({
@@ -67,6 +75,8 @@ export const createBike = (s = 0, d = 3): BikeState => ({
   crashTimer: 0,
   invulnerable: 0,
   crashes: 0,
+  route: -1,
+  explosive: 0,
 });
 
 export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
@@ -90,10 +100,23 @@ export const launchBike = (b: BikeState, events: SimEvent[]): void => {
   events.push({ type: 'jump' });
 };
 
+/** Touch-down after a jump; landing badly crossed knocks the rider down. */
+export const landBike = (b: BikeState, events: SimEvent[]): void => {
+  b.height = 0;
+  b.vy = 0;
+  b.airborne = false;
+  events.push({ type: 'land' });
+  if (Math.abs(b.yaw) > BIKE.landingCrashYaw) crashBike(b, 'landing', events);
+};
+
 export interface BikeEnv {
   /** Road curvature at the bike's position. */
   readonly curvature: number;
   readonly roadHalfWidth: number;
+  /** Road gradient dy/ds at the bike's position (uphill slows the bike down). */
+  readonly slope?: number;
+  /** Side with no wall (a shortcut mouth): +1 right, -1 left, 0 none. */
+  readonly openSide?: number;
 }
 
 /** Advances the bike one fixed step. Pure w.r.t. inputs; mutates `b`. */
@@ -106,6 +129,7 @@ export const stepBike = (
   events: SimEvent[],
 ): void => {
   b.invulnerable = Math.max(0, b.invulnerable - dt);
+  b.explosive = Math.max(0, b.explosive - dt);
   b.wheelieCooldown = Math.max(0, b.wheelieCooldown - dt);
 
   if (b.crashTimer > 0) {
@@ -164,6 +188,8 @@ export const stepBike = (
       b.speed = approach(b.speed, 0, BIKE.rollingDecel * dt);
     }
     if (b.speed > top) b.speed = approach(b.speed, top, BIKE.overspeedDecel * dt);
+    const slope = env.slope ?? 0;
+    if (slope !== 0 && b.speed > 0) b.speed = Math.max(0, b.speed - BIKE.gravity * BIKE.slopeFactor * slope * dt);
   }
 
   // --- Steering --------------------------------------------------------
@@ -189,18 +215,12 @@ export const stepBike = (
   if (b.airborne) {
     b.vy -= BIKE.gravity * dt;
     b.height += b.vy * dt;
-    if (b.height <= 0) {
-      b.height = 0;
-      b.vy = 0;
-      b.airborne = false;
-      events.push({ type: 'land' });
-      if (Math.abs(b.yaw) > BIKE.landingCrashYaw) crashBike(b, 'landing', events);
-    }
+    if (b.height <= 0) landBike(b, events);
   }
 
   // --- Walls -------------------------------------------------------------
   const limit = env.roadHalfWidth - BIKE.wallMargin;
-  if (Math.abs(b.d) > limit) {
+  if (Math.abs(b.d) > limit && Math.sign(b.d) !== (env.openSide ?? 0)) {
     const side = Math.sign(b.d);
     const lateral = b.speed * Math.sin(b.yaw) * side;
     b.d = side * limit;
