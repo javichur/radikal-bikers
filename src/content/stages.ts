@@ -162,6 +162,198 @@ export const roundCorners = (points: readonly P2[], radius: number): P3[] => {
 
 export const STAGES: readonly StageDef[] = [
   {
+    // València in Fallas: from the Ciutat de les Arts i les Ciències along the north bank of the Jardí del Túria,
+    // over the Pont de Serrans, through the Torres de Serrans and across Ciutat Vella to the Porta de la Mar. The
+    // street corners are real map positions (lat/lon projected to metres, uniformly scaled by 0.53).
+    id: 'valencia',
+    nameKey: 'stage.valencia.name',
+    descriptionKey: 'stage.valencia.desc',
+    difficulty: 5,
+    scenery: 'valencia',
+    controlPoints: roundCorners(
+      [
+        [0, 0], // Av. del Professor López Piñero, by L'Umbracle
+        [-301, -205], // corner by L'Àgora
+        [-419, 12], // north end of the Pont de l'Assut de l'Or, then the north bank past the Palau de les Arts
+        [114, 387], // Pont de Montolivet
+        [255, 727], // Pont d'Aragó (Passeig de l'Albereda)
+        [415, 1031], // Pont de l'Exposició
+        [629, 1225], // Pont del Real
+        [811, 1365], // Pont de la Trinitat (Museu de Belles Arts)
+        [984, 1465], // north end of the Pont de Serrans
+        [970, 1313], // Torres de Serrans
+        [934, 1172], // Plaça de la Mare de Déu
+        [952, 1037], // Plaça de la Reina
+        [1030, 867], // Carrer de Sant Vicent Màrtir
+        [984, 768], // Plaça de l'Ajuntament
+        [1002, 598], // Carrer de Xàtiva, Estació del Nord
+        [861, 615], // Xàtiva / Colón
+        [661, 879], // Porta de la Mar
+      ],
+      50,
+    ),
+    profile: [
+      { at: 0, y: 0 },
+      { at: 0.102, y: 0 },
+      { at: 0.11, y: 7 },
+      { at: 0.13, y: 7 },
+      { at: 0.138, y: 0 },
+      { at: 0.652, y: 0 },
+      { at: 0.668, y: 6.8 },
+      { at: 0.68, y: 6.8 },
+      { at: 0.691, y: 0 },
+      { at: 0.708, y: 0 },
+      { at: 0.713, y: 0.5 },
+      { at: 0.718, y: 0 },
+      { at: 0.723, y: 0.5 },
+      { at: 0.728, y: 0 },
+      { at: 0.766, y: 0 },
+      { at: 0.771, y: 0.5 },
+      { at: 0.776, y: 0 },
+      { at: 0.893, y: 0 },
+      { at: 0.903, y: 1.6 },
+      { at: 0.913, y: 0 },
+      { at: 1, y: 0 },
+    ],
+    roadHalfWidth: 11,
+    lanes: { forward: [3, 8], oncoming: [-3, -8] },
+    startTime: 45,
+    checkpoints: [
+      { at: 0.19, bonus: 42 },
+      { at: 0.41, bonus: 32 },
+      { at: 0.61, bonus: 32 },
+      { at: 0.81, bonus: 38 },
+    ],
+    ramps: [
+      { at: 0.06, d: 0, width: 8 },
+      { at: 0.25, d: -5, width: 8 },
+      { at: 0.385, d: 5, width: 8 },
+      { at: 0.53, d: 0, width: 10 },
+      { at: 0.76, d: -5, width: 8 },
+      { at: 0.965, d: 0, width: 10 },
+    ],
+    shortcuts: [
+      // Under the arches of L'Umbracle.
+      { from: 0.02, to: 0.1, side: -1, kind: 'alley' },
+      // Garden paths of the Jardí del Túria by the Palau de les Arts.
+      { from: 0.14, to: 0.185, side: -1, kind: 'dirt' },
+      // Back streets of Penya-roja and Montolivet.
+      { from: 0.235, to: 0.365, side: 1, kind: 'alley' },
+      // Riverbed paths past the Palau de la Música and under La Peineta.
+      { from: 0.455, to: 0.585, side: -1, kind: 'dirt' },
+      // Barri del Carme (Carrer dels Roters murals) to the ceramics shops of the Plaça Redonda.
+      { from: 0.705, to: 0.785, side: 1, kind: 'shop' },
+      // Carrerons of Sant Francesc behind the Plaça de l'Ajuntament.
+      { from: 0.79, to: 0.835, side: -1, kind: 'alley' },
+      // Carrer de Ribera, the pedestrian shopping street down to Xàtiva.
+      { from: 0.85, to: 0.895, side: -1, kind: 'shop' },
+      // Carrer del Poeta Querol and Pintor Sorolla boutiques.
+      { from: 0.9, to: 0.945, side: -1, kind: 'shop' },
+    ],
+    tunnels: [{ from: 0.694, to: 0.702 }],
+    bridges: [
+      { from: 0.106, to: 0.134, river: { halfWidth: 38, halfLength: 250 } },
+      { from: 0.668, to: 0.682, river: { halfWidth: 18, halfLength: 60, dry: true } },
+    ],
+    pickups: [
+      { route: -1, at: 0.085, d: 3.3 },
+      { route: -1, at: 0.33, d: -5 },
+      { route: -1, at: 0.55, d: 5 },
+      { route: -1, at: 0.745, d: 0 },
+      { route: -1, at: 0.93, d: -3.3 },
+      { route: 0, at: 0.5, d: 0 },
+      { route: 3, at: 0.5, d: 0 },
+      { route: 6, at: 0.5, d: 0 },
+    ],
+    obstacles: [
+      { at: 0.3, d: 0, kind: 'cones' },
+      { at: 0.58, d: 0, kind: 'cones' },
+      { at: 0.722, d: 10, kind: 'terrassa' },
+      { at: 0.772, d: -10, kind: 'terrassa' },
+      { at: 0.852, d: 0, kind: 'falla' },
+    ],
+    monuments: [
+      { at: 0.025, d: -110, kind: 'hemisferic' },
+      { at: 0.045, d: -95, kind: 'umbracle' },
+      { at: 0.065, d: -150, kind: 'museuCiencies' },
+      { at: 0.113, d: 21, kind: 'assutPylon' },
+      { at: 0.245, d: -70, kind: 'palauArts' },
+      { at: 0.44, d: -80, kind: 'palauMusica' },
+      { at: 0.495, d: -100, kind: 'peineta' },
+      { at: 0.61, d: 38, kind: 'bellesArts' },
+      { at: 0.698, d: 0, kind: 'torresSerrans' },
+      { at: 0.735, d: -28, kind: 'fontTuria' },
+      { at: 0.765, d: -30, kind: 'micalet' },
+      { at: 0.852, d: 44, kind: 'ajuntament' },
+      { at: 0.843, d: -32, kind: 'correos' },
+      { at: 0.895, d: 42, kind: 'estacioNord' },
+      { at: 0.915, d: 42, kind: 'placaBous' },
+      { at: 0.99, d: 30, kind: 'portaMar' },
+    ],
+    // Jardí del Túria: the old riverbed turned into a sunken park, from the Ciutat de les Arts to the Pont de la
+    // Trinitat (offset of the bank road; the Assut de l'Or crosses the ponds of the Ciutat de les Arts).
+    parks: [
+      [
+        [113, 100],
+        [-259, -153],
+        [-273, -161],
+        [-284, -164],
+        [-296, -161],
+        [-306, -154],
+        [-380, -19],
+        [-385, -6],
+        [-383, 6],
+        [-378, 16],
+        [109, 360],
+        [128, 377],
+        [140, 399],
+        [270, 713],
+        [427, 1012],
+        [435, 1024],
+        [641, 1210],
+        [815, 1344],
+        [859, 1371],
+        [847, 1268],
+        [692, 1149],
+        [492, 967],
+        [346, 688],
+        [216, 375],
+        [191, 328],
+        [150, 291],
+        [48, 220],
+      ],
+    ],
+    trafficDensity: 18,
+    trafficMix: { car: 4, taxi: 2, bus: 2, van: 2, truck: 1, tram: 1 },
+    oncomingSpeedScale: 1.15,
+    roadworks: [
+      { at: 0.17, d: 8, length: 40 },
+      { at: 0.28, d: -8, length: 45 },
+      { at: 0.44, d: 3, length: 35 },
+      { at: 0.5, d: -3, length: 40 },
+      { at: 0.6, d: 8, length: 30 },
+      { at: 0.81, d: -8, length: 30 },
+      { at: 0.94, d: 3, length: 35 },
+    ],
+    roadworksPerRace: 3,
+    rival: 'nitro',
+    grades: { s: 85000, a: 68000, b: 52000 },
+    challenges: [
+      { kind: 'shortcuts', target: 4 },
+      { kind: 'explode', target: 3 },
+      { kind: 'beatRival', target: 0 },
+    ],
+    unlockStars: 0,
+    theme: {
+      sky: 0x8fd3f4,
+      fog: 0xf3e2c7,
+      ground: 0x6fa84f,
+      road: 0x4a4c52,
+      buildings: [0xd9a441, 0xf1e3c6, 0xc8643b, 0xf7f4ee, 0x2f6fb0, 0xe8c07a, 0xb7d3e8],
+    },
+    seed: 1238,
+  },
+  {
     id: 'beach',
     nameKey: 'stage.beach.name',
     descriptionKey: 'stage.beach.desc',
@@ -745,198 +937,6 @@ export const STAGES: readonly StageDef[] = [
       night: true,
     },
     seed: 2026,
-  },
-  {
-    // València in Fallas: from the Ciutat de les Arts i les Ciències along the north bank of the Jardí del Túria,
-    // over the Pont de Serrans, through the Torres de Serrans and across Ciutat Vella to the Porta de la Mar. The
-    // street corners are real map positions (lat/lon projected to metres, uniformly scaled by 0.53).
-    id: 'valencia',
-    nameKey: 'stage.valencia.name',
-    descriptionKey: 'stage.valencia.desc',
-    difficulty: 5,
-    scenery: 'valencia',
-    controlPoints: roundCorners(
-      [
-        [0, 0], // Av. del Professor López Piñero, by L'Umbracle
-        [-301, -205], // corner by L'Àgora
-        [-419, 12], // north end of the Pont de l'Assut de l'Or, then the north bank past the Palau de les Arts
-        [114, 387], // Pont de Montolivet
-        [255, 727], // Pont d'Aragó (Passeig de l'Albereda)
-        [415, 1031], // Pont de l'Exposició
-        [629, 1225], // Pont del Real
-        [811, 1365], // Pont de la Trinitat (Museu de Belles Arts)
-        [984, 1465], // north end of the Pont de Serrans
-        [970, 1313], // Torres de Serrans
-        [934, 1172], // Plaça de la Mare de Déu
-        [952, 1037], // Plaça de la Reina
-        [1030, 867], // Carrer de Sant Vicent Màrtir
-        [984, 768], // Plaça de l'Ajuntament
-        [1002, 598], // Carrer de Xàtiva, Estació del Nord
-        [861, 615], // Xàtiva / Colón
-        [661, 879], // Porta de la Mar
-      ],
-      50,
-    ),
-    profile: [
-      { at: 0, y: 0 },
-      { at: 0.102, y: 0 },
-      { at: 0.11, y: 7 },
-      { at: 0.13, y: 7 },
-      { at: 0.138, y: 0 },
-      { at: 0.652, y: 0 },
-      { at: 0.668, y: 6.8 },
-      { at: 0.68, y: 6.8 },
-      { at: 0.691, y: 0 },
-      { at: 0.708, y: 0 },
-      { at: 0.713, y: 0.5 },
-      { at: 0.718, y: 0 },
-      { at: 0.723, y: 0.5 },
-      { at: 0.728, y: 0 },
-      { at: 0.766, y: 0 },
-      { at: 0.771, y: 0.5 },
-      { at: 0.776, y: 0 },
-      { at: 0.893, y: 0 },
-      { at: 0.903, y: 1.6 },
-      { at: 0.913, y: 0 },
-      { at: 1, y: 0 },
-    ],
-    roadHalfWidth: 11,
-    lanes: { forward: [3, 8], oncoming: [-3, -8] },
-    startTime: 45,
-    checkpoints: [
-      { at: 0.19, bonus: 42 },
-      { at: 0.41, bonus: 32 },
-      { at: 0.61, bonus: 32 },
-      { at: 0.81, bonus: 38 },
-    ],
-    ramps: [
-      { at: 0.06, d: 0, width: 8 },
-      { at: 0.25, d: -5, width: 8 },
-      { at: 0.385, d: 5, width: 8 },
-      { at: 0.53, d: 0, width: 10 },
-      { at: 0.76, d: -5, width: 8 },
-      { at: 0.965, d: 0, width: 10 },
-    ],
-    shortcuts: [
-      // Under the arches of L'Umbracle.
-      { from: 0.02, to: 0.1, side: -1, kind: 'alley' },
-      // Garden paths of the Jardí del Túria by the Palau de les Arts.
-      { from: 0.14, to: 0.185, side: -1, kind: 'dirt' },
-      // Back streets of Penya-roja and Montolivet.
-      { from: 0.235, to: 0.365, side: 1, kind: 'alley' },
-      // Riverbed paths past the Palau de la Música and under La Peineta.
-      { from: 0.455, to: 0.585, side: -1, kind: 'dirt' },
-      // Barri del Carme (Carrer dels Roters murals) to the ceramics shops of the Plaça Redonda.
-      { from: 0.705, to: 0.785, side: 1, kind: 'shop' },
-      // Carrerons of Sant Francesc behind the Plaça de l'Ajuntament.
-      { from: 0.79, to: 0.835, side: -1, kind: 'alley' },
-      // Carrer de Ribera, the pedestrian shopping street down to Xàtiva.
-      { from: 0.85, to: 0.895, side: -1, kind: 'shop' },
-      // Carrer del Poeta Querol and Pintor Sorolla boutiques.
-      { from: 0.9, to: 0.945, side: -1, kind: 'shop' },
-    ],
-    tunnels: [{ from: 0.694, to: 0.702 }],
-    bridges: [
-      { from: 0.106, to: 0.134, river: { halfWidth: 38, halfLength: 250 } },
-      { from: 0.668, to: 0.682, river: { halfWidth: 18, halfLength: 60, dry: true } },
-    ],
-    pickups: [
-      { route: -1, at: 0.085, d: 3.3 },
-      { route: -1, at: 0.33, d: -5 },
-      { route: -1, at: 0.55, d: 5 },
-      { route: -1, at: 0.745, d: 0 },
-      { route: -1, at: 0.93, d: -3.3 },
-      { route: 0, at: 0.5, d: 0 },
-      { route: 3, at: 0.5, d: 0 },
-      { route: 6, at: 0.5, d: 0 },
-    ],
-    obstacles: [
-      { at: 0.3, d: 0, kind: 'cones' },
-      { at: 0.58, d: 0, kind: 'cones' },
-      { at: 0.722, d: 10, kind: 'terrassa' },
-      { at: 0.772, d: -10, kind: 'terrassa' },
-      { at: 0.852, d: 0, kind: 'falla' },
-    ],
-    monuments: [
-      { at: 0.025, d: -110, kind: 'hemisferic' },
-      { at: 0.045, d: -95, kind: 'umbracle' },
-      { at: 0.065, d: -150, kind: 'museuCiencies' },
-      { at: 0.113, d: 21, kind: 'assutPylon' },
-      { at: 0.245, d: -70, kind: 'palauArts' },
-      { at: 0.44, d: -80, kind: 'palauMusica' },
-      { at: 0.495, d: -100, kind: 'peineta' },
-      { at: 0.61, d: 38, kind: 'bellesArts' },
-      { at: 0.698, d: 0, kind: 'torresSerrans' },
-      { at: 0.735, d: -28, kind: 'fontTuria' },
-      { at: 0.765, d: -30, kind: 'micalet' },
-      { at: 0.852, d: 44, kind: 'ajuntament' },
-      { at: 0.843, d: -32, kind: 'correos' },
-      { at: 0.895, d: 42, kind: 'estacioNord' },
-      { at: 0.915, d: 42, kind: 'placaBous' },
-      { at: 0.99, d: 30, kind: 'portaMar' },
-    ],
-    // Jardí del Túria: the old riverbed turned into a sunken park, from the Ciutat de les Arts to the Pont de la
-    // Trinitat (offset of the bank road; the Assut de l'Or crosses the ponds of the Ciutat de les Arts).
-    parks: [
-      [
-        [113, 100],
-        [-259, -153],
-        [-273, -161],
-        [-284, -164],
-        [-296, -161],
-        [-306, -154],
-        [-380, -19],
-        [-385, -6],
-        [-383, 6],
-        [-378, 16],
-        [109, 360],
-        [128, 377],
-        [140, 399],
-        [270, 713],
-        [427, 1012],
-        [435, 1024],
-        [641, 1210],
-        [815, 1344],
-        [859, 1371],
-        [847, 1268],
-        [692, 1149],
-        [492, 967],
-        [346, 688],
-        [216, 375],
-        [191, 328],
-        [150, 291],
-        [48, 220],
-      ],
-    ],
-    trafficDensity: 18,
-    trafficMix: { car: 4, taxi: 2, bus: 2, van: 2, truck: 1, tram: 1 },
-    oncomingSpeedScale: 1.15,
-    roadworks: [
-      { at: 0.17, d: 8, length: 40 },
-      { at: 0.28, d: -8, length: 45 },
-      { at: 0.44, d: 3, length: 35 },
-      { at: 0.5, d: -3, length: 40 },
-      { at: 0.6, d: 8, length: 30 },
-      { at: 0.81, d: -8, length: 30 },
-      { at: 0.94, d: 3, length: 35 },
-    ],
-    roadworksPerRace: 3,
-    rival: 'nitro',
-    grades: { s: 85000, a: 68000, b: 52000 },
-    challenges: [
-      { kind: 'shortcuts', target: 4 },
-      { kind: 'explode', target: 3 },
-      { kind: 'beatRival', target: 0 },
-    ],
-    unlockStars: 8,
-    theme: {
-      sky: 0x8fd3f4,
-      fog: 0xf3e2c7,
-      ground: 0x6fa84f,
-      road: 0x4a4c52,
-      buildings: [0xd9a441, 0xf1e3c6, 0xc8643b, 0xf7f4ee, 0x2f6fb0, 0xe8c07a, 0xb7d3e8],
-    },
-    seed: 1238,
   },
 ];
 

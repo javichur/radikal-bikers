@@ -12,23 +12,25 @@ import { Track } from '../../src/sim/track';
 import { World } from '../../src/sim/world';
 
 describe('stage list', () => {
-  it('is ordered by difficulty, from an easy introduction to the hardest route', () => {
-    const levels = STAGES.map((s) => s.difficulty);
+  it('opens with València, always unlocked, then goes from an easy introduction to the hardest route', () => {
+    expect(STAGES[0]!.id).toBe('valencia');
+    expect(STAGES[0]!.unlockStars).toBe(0);
+    const levels = STAGES.slice(1).map((s) => s.difficulty);
     expect([...levels].sort((a, b) => a - b)).toEqual(levels);
     expect(levels[0]).toBe(1);
     expect(new Set(STAGES.map((s) => s.id)).size).toBe(STAGES.length);
     expect(new Set(STAGES.map((s) => s.scenery))).toEqual(
       new Set(['beach', 'city', 'oldtown', 'industrial', 'hills', 'valencia']),
     );
-    for (const l of levels) expect(l).toBeGreaterThanOrEqual(1);
-    for (const l of levels) expect(l).toBeLessThanOrEqual(5);
+    for (const s of STAGES) expect(s.difficulty).toBeGreaterThanOrEqual(1);
+    for (const s of STAGES) expect(s.difficulty).toBeLessThanOrEqual(5);
   });
 
   it('the easy route gives more time per checkpoint-free stretch and the hard one is the longest', () => {
     const lengths = STAGES.map((s) => new Track(s.controlPoints, 1, s.profile).length);
     const hills = STAGES.find((s) => s.id === 'hills')!;
     expect(Math.max(...lengths)).toBe(new Track(hills.controlPoints, 1, hills.profile).length);
-    const first = STAGES[0]!;
+    const first = STAGES.find((s) => s.difficulty === 1)!;
     expect(first.startTime).toBeGreaterThanOrEqual(Math.max(...STAGES.map((s) => s.startTime)));
   });
 });

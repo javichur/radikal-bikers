@@ -46,7 +46,7 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 - Nota por puntuación (umbrales en `content/stages.ts`, calibrados con el piloto automático de los tests).
 - **XP** = puntuación de cada partida; niveles con coste creciente (máx. 10) y 5 rangos. Las pinturas se desbloquean en
   los niveles 2, 3, 4, 5 y 7.
-- Desbloqueos por estrellas totales: recorrido nocturno (2 ⭐), Nitro (4 ⭐), València (8 ⭐).
+- Desbloqueos por estrellas totales: recorrido nocturno (2 ⭐), Nitro (4 ⭐). València está disponible desde el principio.
 - Estadísticas de carrera en el título: partidas, entregas, km recorridos, «a un pelo», explosiones y mejor combo.
 - Los atajos descubiertos se marcan en la tarjeta del recorrido.
 
@@ -69,7 +69,7 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 
 Como en otros arcades de Gaelco, los recorridos se eligen por dificultad (★ a ★★★★★) y los más difíciles son más
 largos. Casi todos transcurren de día en una ciudad costera de estilo italiano y sus alrededores; el último recorre
-calles reales de València.
+calles reales de València, que aparece la primera del listado y está disponible desde el principio.
 
 | Recorrido              | Dificultad | Longitud | Calzada                   | Tiempo inicial / checkpoints | Rasgos propios                                                                                              |
 | ---------------------- | ---------- | -------- | ------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -106,7 +106,7 @@ de autobuses y tranvías), las farolas (cono y charco de luz), los túneles (luz
 rótulos de las tiendas y las ventanas de los edificios. Son luces falsas (formas aditivas con degradado por vértice), sin
 coste de luces reales.
 
-**València** (★★★★★, ~3,9 km, 4 carriles, 45 s / +42, +32, +32, +38 s; se desbloquea con 8 ⭐): reparto en plenas
+**València** (★★★★★, ~3,9 km, 4 carriles, 45 s / +42, +32, +32, +38 s; primera del listado y sin bloqueo): reparto en plenas
 Fallas sobre un trazado sacado de coordenadas reales (lat/lon proyectadas a metros con una escala uniforme de 0,53, así
 se conservan ángulos y proporciones). Las esquinas se han situado de memoria (sin contrastar con OpenStreetMap), con un
 margen de unos 100 m reales:
