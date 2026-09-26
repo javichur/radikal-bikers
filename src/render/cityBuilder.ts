@@ -3,6 +3,7 @@ import { Rng } from '../core/rng';
 import { MONUMENTS } from '../content/monuments';
 import { DEFAULT_TRAFFIC_MIX } from '../content/vehicles';
 import { inPolygon, inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
+import { laneFits, NARROW_TAPER } from '../sim/roadWidth';
 import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
 import type { PickupKind } from '../sim/events';
 import type { World } from '../sim/world';
@@ -38,7 +39,7 @@ import {
   turboTexture,
   windowTextures,
 } from './textures';
-import { inRanges, ribbon, segments, sweep, wall } from './trackGeometry';
+import { inRanges, ribbon, segments, sweep, wall, widened } from './trackGeometry';
 
 const ROAD_TEX_LENGTH = 16;
 
@@ -137,17 +138,43 @@ export const buildCity = (world: World): CityScene => {
   ground.receiveShadow = true;
   root.add(ground);
 
-  const road = new THREE.Mesh(
-    ribbon(track, -hw - 0.5, hw + 0.5, 0.02, 2, ROAD_TEX_LENGTH),
-    toon(0xffffff, {
-      map: roadTexture(hw + 0.5, stage.lanes.forward, stage.lanes.oncoming, {
-        cobbles: look.cobbles,
-        rails: (mix.tram ?? 0) > 0 ? [...stage.lanes.forward, ...stage.lanes.oncoming] : [],
-      }),
-    }),
-  );
-  road.receiveShadow = true;
-  root.add(road);
+  // The city follows the carriageway where narrow streets squeeze it.
+  const street = widened(track, (s) => world.halfWidthAt(s), hw);
+  const lanes = [...stage.lanes.forward, ...stage.lanes.oncoming];
+  const rails = (mix.tram ?? 0) > 0 ? lanes : [];
+  const narrowRanges = world.narrows.map((n) => ({ from: n.from - NARROW_TAPER, to: n.to + NARROW_TAPER }));
+  const roadMat = toon(0xffffff, {
+    map: roadTexture(hw + 0.5, stage.lanes.forward, stage.lanes.oncoming, { cobbles: look.cobbles, rails }),
+  });
+  for (const seg of segments(0, L, narrowRanges)) {
+    const road = new THREE.Mesh(
+      ribbon(track, -hw - 0.5, hw + 0.5, 0.02, 2, ROAD_TEX_LENGTH, seg.from, seg.to),
+      roadMat,
+    );
+    road.receiveShadow = true;
+    root.add(road);
+  }
+  // Narrow streets: one lane each way over setts, the painted lines following the taper.
+  for (const n of world.narrows) {
+    const open = (ds: readonly number[]): number[] => ds.filter((d) => laneFits(d, n.halfWidth));
+    const tex = roadTexture(n.halfWidth + 0.5, open(stage.lanes.forward), open(stage.lanes.oncoming), {
+      cobbles: true,
+      rails: rails.filter((d) => laneFits(d, n.halfWidth)),
+    });
+    const geo = ribbon(
+      street,
+      -hw - 0.5,
+      hw + 0.5,
+      0.02,
+      1,
+      ROAD_TEX_LENGTH,
+      n.from - NARROW_TAPER,
+      n.to + NARROW_TAPER,
+    );
+    const road = new THREE.Mesh(geo, toon(0xffffff, { map: tex }));
+    road.receiveShadow = true;
+    root.add(road);
+  }
 
   const tunnels = stage.tunnels.map((r) => ({ from: r.from * L, to: r.to * L }));
   const spans = stage.bridges.map((r) => bridgeSpan(world, { from: r.from * L, to: r.to * L }));
@@ -167,16 +194,16 @@ export const buildCity = (world: World): CityScene => {
     const a = side * (hw + 0.5);
     const b = side * (hw + 0.5 + SIDEWALK);
     for (const seg of segments(0, L, gaps)) {
-      const sw = new THREE.Mesh(ribbon(track, Math.min(a, b), Math.max(a, b), 0.22, 2, 4, seg.from, seg.to), walk);
+      const sw = new THREE.Mesh(ribbon(street, Math.min(a, b), Math.max(a, b), 0.22, 2, 4, seg.from, seg.to), walk);
       sw.receiveShadow = true;
       root.add(sw);
       const c0 = side < 0 ? a - 0.3 : a;
-      root.add(new THREE.Mesh(ribbon(track, c0, c0 + 0.3, 0.26, 2, 4, seg.from, seg.to), curb));
+      root.add(new THREE.Mesh(ribbon(street, c0, c0 + 0.3, 0.26, 2, 4, seg.from, seg.to), curb));
       for (const part of segments(seg.from, seg.to, spans)) {
         if (look.guardrails) {
           // Country road: grassy embankment sloping down from the shoulder.
           const bankGeo = sweep(
-            track,
+            street,
             [side < 0 ? [b - 16, 0] : [b, 0.22], side < 0 ? [b, 0.22] : [b + 16, 0]],
             part.from,
             part.to,
@@ -186,12 +213,12 @@ export const buildCity = (world: World): CityScene => {
           );
           root.add(new THREE.Mesh(bankGeo, bank));
         } else {
-          root.add(new THREE.Mesh(wall(track, b, 0, 0.22, part.from, part.to, 2, 4, true), skirt));
+          root.add(new THREE.Mesh(wall(street, b, 0, 0.22, part.from, part.to, 2, 4, true), skirt));
         }
       }
       if (look.guardrails) {
         const g0 = side * (hw + 0.5 + SIDEWALK - 0.3);
-        root.add(new THREE.Mesh(wall(track, g0, 0.5, 0.85, seg.from, seg.to, 2, 4), rail));
+        root.add(new THREE.Mesh(wall(street, g0, 0.5, 0.85, seg.from, seg.to, 2, 4), rail));
       }
     }
   }
@@ -210,7 +237,7 @@ export const buildCity = (world: World): CityScene => {
   parks.forEach((poly) => buildPark(poly, PARK_GREEN, root));
   for (let s = 0; s <= L; s += 6) {
     const p = track.toWorld(s, 0);
-    obstacles.push({ x: p.x, z: p.z, r: hw + SIDEWALK + 0.3 });
+    obstacles.push({ x: p.x, z: p.z, r: world.halfWidthAt(s) + SIDEWALK + 0.3 });
   }
   // Monuments, facing the road, with the buildings kept out of their footprint.
   for (const mon of stage.monuments ?? []) {
@@ -300,7 +327,7 @@ export const buildCity = (world: World): CityScene => {
   /** Light pools on the road next to each street lamp (night only). */
   const lampPools: THREE.Matrix4[] = [];
   const placeRow = (row: BuildingRow): void => {
-    const t = world.trackOf(row.route);
+    const t = row.route < 0 ? street : world.trackOf(row.route);
     const side = Math.sign(row.offset);
     let s = row.from;
     while (s < row.to && count < maxBuildings) {
@@ -340,12 +367,12 @@ export const buildCity = (world: World): CityScene => {
       if (inRanges(s, gaps, 3) || inRanges(s, tunnels, 2)) continue;
       const onBridge = inRanges(s, spans);
       if (rng.next() >= look.propChance) continue;
-      const pp = track.toWorld(s, side * (hw + 2.8));
+      const pp = street.toWorld(s, side * (hw + 2.8));
       const mat = new THREE.Matrix4().makeTranslation(pp.x, pp.y + 0.2, pp.z);
       const tree = !onBridge && rng.next() < look.treeChance;
       if (tree || !look.guardrails) (tree ? propsTrees : propsLamps).push(mat);
       if (night && !tree && !look.guardrails)
-        lampPools.push(poolMatrix(track.toWorld(s, side * (hw - 0.5)), track.sample(s).slope));
+        lampPools.push(poolMatrix(street.toWorld(s, side * (hw - 0.5)), track.sample(s).slope));
     }
   }
   rows.forEach((r) => placeRow({ ...r, minHeight: look.routeHeight[0], maxHeight: look.routeHeight[1] }));
@@ -471,7 +498,7 @@ export const buildCity = (world: World): CityScene => {
   // Checkpoint gates + finish.
   const cpTex = bannerTexture('CHECKPOINT');
   const addGate = (s: number, tex: THREE.Texture): void => {
-    const g = gate(hw * 2 + 1.5, tex);
+    const g = gate(world.halfWidthAt(s) * 2 + 1.5, tex);
     const p = track.toWorld(s, 0);
     g.position.set(p.x, p.y, p.z);
     g.rotation.y = p.heading;

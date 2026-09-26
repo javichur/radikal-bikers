@@ -1,3 +1,4 @@
+import type { ValenciaShop } from './shops';
 import type { ChallengeDef, GradeThresholds } from './challenges';
 import type { MonumentKind } from './monuments';
 import type { PickupKind } from '../sim/events';
@@ -15,6 +16,8 @@ export interface ShortcutDef {
    * lanes between fields.
    */
   readonly kind: 'alley' | 'shop' | 'dirt';
+  /** València shops at the entry and exit of a `shop` shortcut (picked at random from the stage's shops if unset). */
+  readonly shops?: readonly [ValenciaShop, ValenciaShop];
 }
 
 /** Look of the surroundings: buildings, props, road surface and landmarks. */
@@ -33,6 +36,11 @@ export interface StageDef {
   readonly profile?: readonly { readonly at: number; readonly y: number }[];
   /** Half of the drivable road width, metres. */
   readonly roadHalfWidth: number;
+  /**
+   * Narrow streets (course fractions): the carriageway shrinks to `halfWidth` (tapering in and out over
+   * `NARROW_TAPER` metres) and the lanes that no longer fit are closed to traffic.
+   */
+  readonly narrows?: readonly { readonly from: number; readonly to: number; readonly halfWidth: number }[];
   /** Lateral offsets of the lane centres (positive = right). */
   readonly lanes: {
     readonly forward: readonly number[];
@@ -108,11 +116,11 @@ type P3 = readonly [number, number, number];
 /**
  * Street-grid layout helper: turns a polyline into evenly spaced spline control points with every corner rounded to
  * an arc of the given radius (city blocks with tight turns instead of the smooth curves of a spline through the
- * vertices).
+ * vertices). A vertex can carry its own radius as a third coordinate (tight corners of old-town squares).
  */
-export const roundCorners = (points: readonly P2[], radius: number): P3[] => {
+export const roundCorners = (points: readonly (P2 | P3)[], radius: number): P3[] => {
   const SPACING = 20;
-  const path: P2[] = [points[0]!];
+  const path: P2[] = [[points[0]![0], points[0]![1]]];
   for (let i = 1; i < points.length - 1; i++) {
     const [px, pz] = points[i - 1]!;
     const [vx, vz] = points[i]!;
@@ -120,7 +128,7 @@ export const roundCorners = (points: readonly P2[], radius: number): P3[] => {
     const la = Math.hypot(px - vx, pz - vz);
     const lc = Math.hypot(nx - vx, nz - vz);
     if (la === 0 || lc === 0) {
-      path.push(points[i]!);
+      path.push([vx, vz]);
       continue;
     }
     const ax = (px - vx) / la;
@@ -130,23 +138,25 @@ export const roundCorners = (points: readonly P2[], radius: number): P3[] => {
     const theta = Math.acos(Math.max(-1, Math.min(1, ax * cx + az * cz)));
     const bl = Math.hypot(ax + cx, az + cz);
     if (bl < 1e-6 || theta < 1e-6) {
-      path.push(points[i]!);
+      path.push([vx, vz]);
       continue;
     }
-    const t = radius / Math.tan(theta / 2);
-    const ox = vx + ((ax + cx) / bl) * (radius / Math.sin(theta / 2));
-    const oz = vz + ((az + cz) / bl) * (radius / Math.sin(theta / 2));
+    const r = points[i]![2] ?? radius;
+    const t = r / Math.tan(theta / 2);
+    const ox = vx + ((ax + cx) / bl) * (r / Math.sin(theta / 2));
+    const oz = vz + ((az + cz) / bl) * (r / Math.sin(theta / 2));
     const a1 = Math.atan2(vz + az * t - oz, vx + ax * t - ox);
     let a2 = Math.atan2(vz + cz * t - oz, vx + cx * t - ox);
     if (a2 - a1 > Math.PI) a2 -= 2 * Math.PI;
     if (a2 - a1 < -Math.PI) a2 += 2 * Math.PI;
-    const n = Math.max(2, Math.ceil((Math.abs(a2 - a1) * radius) / SPACING));
+    const n = Math.max(2, Math.ceil((Math.abs(a2 - a1) * r) / SPACING));
     for (let k = 0; k <= n; k++) {
       const a = a1 + ((a2 - a1) * k) / n;
-      path.push([ox + Math.cos(a) * radius, oz + Math.sin(a) * radius]);
+      path.push([ox + Math.cos(a) * r, oz + Math.sin(a) * r]);
     }
   }
-  path.push(points[points.length - 1]!);
+  const end = points[points.length - 1]!;
+  path.push([end[0], end[1]]);
   // Even spacing along the straights keeps the Catmull-Rom spline from overshooting.
   const out: P3[] = [];
   for (let i = 0; i < path.length - 1; i++) {
@@ -181,114 +191,125 @@ export const STAGES: readonly StageDef[] = [
         [629, 1225], // Pont del Real
         [811, 1365], // Pont de la Trinitat (Museu de Belles Arts)
         [984, 1465], // north end of the Pont de Serrans
-        [970, 1313], // Torres de Serrans
-        [934, 1172], // Plaça de la Mare de Déu
-        [952, 1037], // Plaça de la Reina
-        [1030, 867], // Carrer de Sant Vicent Màrtir
+        [970, 1313], // Torres de Serrans, then down the Carrer de Serrans
+        [1012, 1168, 22], // Plaça de Manises (Palau de la Generalitat), into the Carrer de Cavallers
+        [1150, 1140, 22], // Plaça del Tossal, down the Carrer de la Bosseria
+        [1112, 1076, 25], // Plaça del Mercat, between the Mercat Central and the Llotja
+        [1096, 1008, 80], // Plaça del Mercat, south end: down the Avinguda de Maria Cristina
         [984, 768], // Plaça de l'Ajuntament
         [1002, 598], // Carrer de Xàtiva, Estació del Nord
         [861, 615], // Xàtiva / Colón
-        [661, 879], // Porta de la Mar
+        [661, 879, 60], // Porta de la Mar, round the gate into the Carrer del General Palanca
+        [700, 1050], // Plaça de Tetuan (Convent de Sant Domènec)
       ],
       50,
     ),
     profile: [
       { at: 0, y: 0 },
-      { at: 0.102, y: 0 },
-      { at: 0.11, y: 7 },
-      { at: 0.13, y: 7 },
-      { at: 0.138, y: 0 },
-      { at: 0.652, y: 0 },
-      { at: 0.668, y: 6.8 },
-      { at: 0.68, y: 6.8 },
-      { at: 0.691, y: 0 },
-      { at: 0.708, y: 0 },
-      { at: 0.713, y: 0.5 },
-      { at: 0.718, y: 0 },
-      { at: 0.723, y: 0.5 },
-      { at: 0.728, y: 0 },
-      { at: 0.766, y: 0 },
-      { at: 0.771, y: 0.5 },
-      { at: 0.776, y: 0 },
-      { at: 0.893, y: 0 },
-      { at: 0.903, y: 1.6 },
-      { at: 0.913, y: 0 },
+      { at: 0.0953, y: 0 },
+      { at: 0.1027, y: 7 },
+      { at: 0.1214, y: 7 },
+      { at: 0.1289, y: 0 },
+      { at: 0.609, y: 0 },
+      { at: 0.6239, y: 6.8 },
+      { at: 0.6352, y: 6.8 },
+      { at: 0.6455, y: 0 },
+      // Raised pedestrian crossings in the Carrer de Serrans and the Carrer de Cavallers.
+      { at: 0.6678, y: 0 },
+      { at: 0.6716, y: 0.5 },
+      { at: 0.6755, y: 0 },
+      { at: 0.6966, y: 0 },
+      { at: 0.7004, y: 0.5 },
+      { at: 0.7042, y: 0 },
       { at: 1, y: 0 },
     ],
     roadHalfWidth: 11,
+    // Ciutat Vella: the Carrer de Serrans, the Carrer de Cavallers, the Carrer de la Bosseria and the Plaça del
+    // Mercat are one lane each way between old façades.
+    narrows: [{ from: 0.664, to: 0.7494, halfWidth: 5 }],
     lanes: { forward: [3, 8], oncoming: [-3, -8] },
     startTime: 45,
     checkpoints: [
-      { at: 0.19, bonus: 42 },
-      { at: 0.41, bonus: 32 },
-      { at: 0.61, bonus: 32 },
-      { at: 0.81, bonus: 38 },
+      { at: 0.1775, bonus: 42 },
+      { at: 0.3829, bonus: 32 },
+      { at: 0.57, bonus: 32 },
+      { at: 0.7762, bonus: 38 },
     ],
     ramps: [
-      { at: 0.06, d: 0, width: 8 },
-      { at: 0.25, d: -5, width: 8 },
-      { at: 0.385, d: 5, width: 8 },
-      { at: 0.53, d: 0, width: 10 },
-      { at: 0.76, d: -5, width: 8 },
-      { at: 0.965, d: 0, width: 10 },
+      { at: 0.0561, d: 0, width: 8 },
+      { at: 0.2336, d: -5, width: 8 },
+      { at: 0.3596, d: 5, width: 8 },
+      { at: 0.4951, d: 0, width: 10 },
+      { at: 0.7676, d: -5, width: 8 },
+      { at: 0.9259, d: 0, width: 10 },
     ],
     shortcuts: [
       // Under the arches of L'Umbracle.
-      { from: 0.02, to: 0.1, side: -1, kind: 'alley' },
+      { from: 0.0187, to: 0.0931, side: -1, kind: 'alley' },
       // Garden paths of the Jardí del Túria by the Palau de les Arts.
-      { from: 0.14, to: 0.185, side: -1, kind: 'dirt' },
-      // Back streets of Penya-roja and Montolivet.
-      { from: 0.235, to: 0.365, side: 1, kind: 'alley' },
-      // Riverbed paths past the Palau de la Música and under La Peineta.
-      { from: 0.455, to: 0.585, side: -1, kind: 'dirt' },
-      // Barri del Carme (Carrer dels Roters murals) to the ceramics shops of the Plaça Redonda.
-      { from: 0.705, to: 0.785, side: 1, kind: 'shop' },
-      // Carrerons of Sant Francesc behind the Plaça de l'Ajuntament.
-      { from: 0.79, to: 0.835, side: -1, kind: 'alley' },
-      // Carrer de Ribera, the pedestrian shopping street down to Xàtiva.
-      { from: 0.85, to: 0.895, side: -1, kind: 'shop' },
-      // Carrer del Poeta Querol and Pintor Sorolla boutiques.
-      { from: 0.9, to: 0.945, side: -1, kind: 'shop' },
+      { from: 0.1308, to: 0.1728, side: -1, kind: 'dirt' },
+      // Back streets of Penya-roja, through a Consum and the forn on the corner.
+      { from: 0.2196, to: 0.341, side: 1, kind: 'shop', shops: ['consum', 'forn'] },
+      // Down into the Jardí del Túria: the riverbed paths past the Palau de la Música, under la Peineta and
+      // the Pont del Real, up again by the Pont de la Trinitat.
+      { from: 0.4218, to: 0.6039, side: -1, kind: 'dirt' },
+      // Barri del Carme: from the Carrer de Serrans through the Carrer dels Roters murals to the Carrer de Cavallers.
+      { from: 0.665, to: 0.7069, side: 1, kind: 'shop', shops: ['ventalls', 'ceramica'] },
+      // Behind Sant Nicolau from the Carrer de Cavallers to the Plaça del Mercat, by the fruit stalls.
+      { from: 0.7098, to: 0.74, side: -1, kind: 'shop', shops: ['taronges', 'mercat'] },
+      // Carrer de Ribera, the pedestrian shopping street from the Plaça de l'Ajuntament to Xàtiva.
+      { from: 0.8244, to: 0.865, side: -1, kind: 'shop', shops: ['pirotecnia', 'bunyols'] },
+      // Back streets of the Eixample between Xàtiva and Colón, through a Mercadona and an orxateria.
+      { from: 0.8674, to: 0.9058, side: -1, kind: 'shop', shops: ['orxateria', 'mercadona'] },
+      // Through the gardens of the Glorieta and the Parterre, from Colón to the Plaça de Tetuan.
+      { from: 0.9154, to: 0.9897, side: -1, kind: 'dirt' },
     ],
-    tunnels: [{ from: 0.694, to: 0.702 }],
+    tunnels: [{ from: 0.6475, to: 0.6552 }],
     bridges: [
-      { from: 0.106, to: 0.134, river: { halfWidth: 38, halfLength: 250 } },
-      { from: 0.668, to: 0.682, river: { halfWidth: 18, halfLength: 60, dry: true } },
+      { from: 0.099, to: 0.1252, river: { halfWidth: 38, halfLength: 250 } },
+      { from: 0.6239, to: 0.6371, river: { halfWidth: 18, halfLength: 60, dry: true } },
     ],
     pickups: [
-      { route: -1, at: 0.085, d: 3.3 },
-      { route: -1, at: 0.33, d: -5 },
-      { route: -1, at: 0.55, d: 5 },
-      { route: -1, at: 0.745, d: 0 },
-      { route: -1, at: 0.93, d: -3.3 },
+      { route: -1, at: 0.0795, d: 3.3 },
+      { route: -1, at: 0.3083, d: -5 },
+      { route: -1, at: 0.5137, d: 5 },
+      { route: -1, at: 0.6831, d: 0 },
+      { route: -1, at: 0.8924, d: -3.3 },
       { route: 0, at: 0.5, d: 0 },
       { route: 3, at: 0.5, d: 0 },
+      { route: 4, at: 0.5, d: 0 },
       { route: 6, at: 0.5, d: 0 },
+      { route: 8, at: 0.5, d: 0 },
     ],
     obstacles: [
-      { at: 0.3, d: 0, kind: 'cones' },
-      { at: 0.58, d: 0, kind: 'cones' },
-      { at: 0.722, d: 10, kind: 'terrassa' },
-      { at: 0.772, d: -10, kind: 'terrassa' },
-      { at: 0.852, d: 0, kind: 'falla' },
+      { at: 0.2802, d: 0, kind: 'cones' },
+      { at: 0.5417, d: 0, kind: 'cones' },
+      { at: 0.7945, d: -10, kind: 'terrassa' },
+      { at: 0.8166, d: 0, kind: 'falla' },
+      { at: 0.8635, d: 10, kind: 'terrassa' },
     ],
     monuments: [
-      { at: 0.025, d: -110, kind: 'hemisferic' },
-      { at: 0.045, d: -95, kind: 'umbracle' },
-      { at: 0.065, d: -150, kind: 'museuCiencies' },
-      { at: 0.113, d: 21, kind: 'assutPylon' },
-      { at: 0.245, d: -70, kind: 'palauArts' },
-      { at: 0.44, d: -80, kind: 'palauMusica' },
-      { at: 0.495, d: -100, kind: 'peineta' },
-      { at: 0.61, d: 38, kind: 'bellesArts' },
-      { at: 0.698, d: 0, kind: 'torresSerrans' },
-      { at: 0.735, d: -28, kind: 'fontTuria' },
-      { at: 0.765, d: -30, kind: 'micalet' },
-      { at: 0.852, d: 44, kind: 'ajuntament' },
-      { at: 0.843, d: -32, kind: 'correos' },
-      { at: 0.895, d: 42, kind: 'estacioNord' },
-      { at: 0.915, d: 42, kind: 'placaBous' },
-      { at: 0.99, d: 30, kind: 'portaMar' },
+      { at: 0.0233, d: -110, kind: 'hemisferic' },
+      { at: 0.0421, d: -95, kind: 'umbracle' },
+      { at: 0.0608, d: -150, kind: 'museuCiencies' },
+      { at: 0.1055, d: 21, kind: 'assutPylon' },
+      { at: 0.2289, d: -70, kind: 'palauArts' },
+      { at: 0.411, d: -80, kind: 'palauMusica' },
+      { at: 0.4624, d: -125, kind: 'peineta' },
+      { at: 0.5699, d: 38, kind: 'bellesArts' },
+      { at: 0.6514, d: 0, kind: 'torresSerrans' },
+      { at: 0.6862, d: -40, kind: 'fontTuria' },
+      { at: 0.6867, d: -106, kind: 'catedral' },
+      { at: 0.6889, d: -126, kind: 'micalet' },
+      { at: 0.6949, d: 19.5, kind: 'generalitat' },
+      { at: 0.7391, d: 33, kind: 'mercatCentral' },
+      { at: 0.7464, d: -24, kind: 'llotja' },
+      { at: 0.8168, d: 44, kind: 'ajuntament' },
+      { at: 0.8206, d: -35, kind: 'correos' },
+      { at: 0.8497, d: 50, kind: 'estacioNord' },
+      { at: 0.8683, d: 50, kind: 'placaBous' },
+      { at: 0.9308, d: 136, kind: 'mercatColon' },
+      { at: 0.9581, d: 32, kind: 'portaMar' },
     ],
     // Jardí del Túria: the old riverbed turned into a sunken park, from the Ciutat de les Arts to the Pont de la
     // Trinitat (offset of the bank road; the Assut de l'Or crosses the ponds of the Ciutat de les Arts).
@@ -327,13 +348,13 @@ export const STAGES: readonly StageDef[] = [
     trafficMix: { car: 4, taxi: 2, bus: 2, van: 2, truck: 1, tram: 1 },
     oncomingSpeedScale: 1.15,
     roadworks: [
-      { at: 0.17, d: 8, length: 40 },
-      { at: 0.28, d: -8, length: 45 },
-      { at: 0.44, d: 3, length: 35 },
-      { at: 0.5, d: -3, length: 40 },
-      { at: 0.6, d: 8, length: 30 },
-      { at: 0.81, d: -8, length: 30 },
-      { at: 0.94, d: 3, length: 35 },
+      { at: 0.1588, d: 8, length: 40 },
+      { at: 0.2615, d: -8, length: 45 },
+      { at: 0.411, d: 3, length: 35 },
+      { at: 0.467, d: -3, length: 40 },
+      { at: 0.5605, d: 8, length: 30 },
+      { at: 0.7791, d: 8, length: 30 },
+      { at: 0.902, d: 3, length: 35 },
     ],
     roadworksPerRace: 3,
     rival: 'nitro',

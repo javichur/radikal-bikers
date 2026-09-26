@@ -2,6 +2,23 @@ import * as THREE from 'three';
 import type { Range } from '../sim/shortcuts';
 import type { Track } from '../sim/track';
 
+/** What the sweeps need from a track: its length and the (distance, lateral offset) → world mapping. */
+export type Frame = Pick<Track, 'toWorld' | 'length'>;
+
+/**
+ * The main road as the city is laid out along it where its width varies: lateral offsets are given for the stage's
+ * base half width `base` and are squeezed to the local half width `hwAt(s)` — proportionally across the carriageway
+ * and shifted beyond it — so sidewalks, curbs and facades follow narrow streets.
+ */
+export const widened = (track: Track, hwAt: (s: number) => number, base: number): Frame => ({
+  length: track.length,
+  toWorld: (s, d) => {
+    const hw = hwAt(s);
+    if (hw === base) return track.toWorld(s, d);
+    return track.toWorld(s, Math.abs(d) <= base ? (d * hw) / base : d + Math.sign(d) * (hw - base));
+  },
+});
+
 const build = (pos: number[], uv: number[], idx: number[]): THREE.BufferGeometry => {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -21,7 +38,7 @@ const samples = (from: number, to: number, step: number): number[] => {
  * `absolute` is set the heights are measured from the ground (y = 0) instead of the road surface.
  */
 export const sweep = (
-  track: Track,
+  track: Frame,
   profile: readonly (readonly [number, number])[],
   from: number,
   to: number,
@@ -53,7 +70,7 @@ export const sweep = (
 
 /** Flat strip following the track between lateral offsets d0..d1, `lift` above the road. */
 export const ribbon = (
-  track: Track,
+  track: Frame,
   d0: number,
   d1: number,
   lift: number,
@@ -76,7 +93,7 @@ export const ribbon = (
 
 /** Vertical strip at lateral offset d, from `bottom` to `top` above the road (or from the ground if `toGround`). */
 export const wall = (
-  track: Track,
+  track: Frame,
   d: number,
   bottom: number,
   top: number,

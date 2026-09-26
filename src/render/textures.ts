@@ -219,7 +219,10 @@ export const signTexture = (text: string, bg: string, fg = '#ffffff'): THREE.Tex
     c.lineWidth = 8;
     c.strokeRect(10, 10, 492, 108);
     c.fillStyle = fg;
-    c.font = 'bold 76px "Trebuchet MS", sans-serif';
+    // Long names shrink to fit inside the frame.
+    let size = 76;
+    do c.font = `bold ${size}px "Trebuchet MS", sans-serif`;
+    while (c.measureText(text).width > 460 && (size -= 4) > 28);
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillText(text, 256, 68);

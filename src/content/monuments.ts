@@ -11,10 +11,15 @@ export type MonumentKind =
   | 'torresSerrans'
   | 'fontTuria'
   | 'micalet'
+  | 'catedral'
+  | 'generalitat'
+  | 'mercatCentral'
+  | 'llotja'
   | 'ajuntament'
   | 'correos'
   | 'estacioNord'
   | 'placaBous'
+  | 'mercatColon'
   | 'portaMar';
 
 export interface MonumentDef {
@@ -48,6 +53,14 @@ export const MONUMENTS: Readonly<Record<MonumentKind, MonumentDef>> = {
   fontTuria: { kind: 'fontTuria', radius: 10 },
   /** El Micalet: the octagonal bell tower of the cathedral. */
   micalet: { kind: 'micalet', radius: 12 },
+  /** Catedral de València: the gothic nave and apse with its octagonal lantern (cimbori). */
+  catedral: { kind: 'catedral', radius: 22 },
+  /** Palau de la Generalitat: gothic palace with its corner tower, at the Plaça de Manises. */
+  generalitat: { kind: 'generalitat', radius: 9 },
+  /** Mercat Central: modernist iron-and-glass market hall with tiled domes, crowned by the parrot weathervane. */
+  mercatCentral: { kind: 'mercatCentral', radius: 18 },
+  /** Llotja de la Seda: the late-gothic silk exchange, crenellated, with its tower. */
+  llotja: { kind: 'llotja', radius: 13 },
   /** Ajuntament: the town hall façade with its clock tower. */
   ajuntament: { kind: 'ajuntament', radius: 26 },
   /** Edifici de Correus: the post office with its glass dome and crown. */
@@ -56,6 +69,8 @@ export const MONUMENTS: Readonly<Record<MonumentKind, MonumentDef>> = {
   estacioNord: { kind: 'estacioNord', radius: 24 },
   /** Plaça de Bous: the neoclassical bullring, rows of brick arches. */
   placaBous: { kind: 'placaBous', radius: 24 },
+  /** Mercat de Colón: modernist market with its brick-and-iron arched gable and trencadís. */
+  mercatColon: { kind: 'mercatColon', radius: 16 },
   /** Porta de la Mar: the triumphal arch in the middle of its roundabout. */
   portaMar: { kind: 'portaMar', radius: 12 },
 };
