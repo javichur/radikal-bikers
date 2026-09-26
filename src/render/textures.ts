@@ -115,21 +115,32 @@ export const alleyTexture = (): THREE.Texture =>
     }),
   );
 
-export const windowTexture = (): THREE.Texture =>
-  repeat(
+/** Building facade with windows, and a matching glow map with only the lit windows (for night stages). */
+export const windowTextures = (): { map: THREE.Texture; glow: THREE.Texture } => {
+  const cells: [number, number, boolean][] = [];
+  for (let y = 12; y < 250; y += 28) for (let x = 10; x < 120; x += 28) cells.push([x, y, Math.random() < 0.25]);
+  const map = repeat(
     canvasTexture(128, 256, (c) => {
       c.fillStyle = '#ffffff';
       c.fillRect(0, 0, 128, 256);
-      for (let y = 12; y < 250; y += 28) {
-        for (let x = 10; x < 120; x += 28) {
-          c.fillStyle = Math.random() < 0.25 ? '#fff3c4' : '#5b6b8c';
-          c.fillRect(x, y, 16, 16);
-        }
+      for (const [x, y, lit] of cells) {
+        c.fillStyle = lit ? '#fff3c4' : '#5b6b8c';
+        c.fillRect(x, y, 16, 16);
       }
       c.fillStyle = 'rgba(0,0,0,0.15)';
       c.fillRect(0, 250, 128, 6);
     }),
   );
+  const glow = repeat(
+    canvasTexture(128, 256, (c) => {
+      c.fillStyle = '#000000';
+      c.fillRect(0, 0, 128, 256);
+      c.fillStyle = '#ffd98a';
+      for (const [x, y, lit] of cells) if (lit) c.fillRect(x, y, 16, 16);
+    }),
+  );
+  return { map, glow };
+};
 
 export const brickTexture = (): THREE.Texture =>
   repeat(

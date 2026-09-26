@@ -99,7 +99,10 @@ Cada partida elige al azar 2 **obras** (conos que cierran un carril; el tráfico
 atropellar un cono frena la moto) y usa una semilla de tráfico distinta (fija con `?e2e`).
 
 **Puerto Radikal de noche**: mismas calles con iluminación nocturna y faro, más tráfico, 3 obras, rival Nitro y retos
-más duros.
+más duros. De noche también se iluminan los demás vehículos (faros con haz en el asfalto, pilotos traseros y ventanillas
+de autobuses y tranvías), las farolas (cono y charco de luz), los túneles (luz bajo cada plafón), los escaparates y
+rótulos de las tiendas y las ventanas de los edificios. Son luces falsas (formas aditivas con degradado por vértice), sin
+coste de luces reales.
 
 ## HUD
 

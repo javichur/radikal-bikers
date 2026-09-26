@@ -2,12 +2,19 @@ import * as THREE from 'three';
 import type { VehicleKind } from '../content/vehicles';
 import { VEHICLES } from '../content/vehicles';
 import { toon, withOutline } from './materials';
+import { beamGeometry, glowMaterial, HEADLIGHT, poolGeometry, TAIL_LIGHT } from './nightLights';
 
 const PALETTE = [0xef476f, 0x118ab2, 0x06d6a0, 0xf78c6b, 0x8338ec, 0xffffff, 0x3a86ff, 0x8d99ae];
 const GLASS = 0x2d3a5a;
 
+/** Warm cabin light seen through bus and tram windows at night. */
+const LIT_WINDOWS = 0xffe8a3;
+
 const part = (w: number, h: number, d: number, color: number, x: number, y: number, z: number): THREE.Group => {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(color));
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    toon(color, color === LIT_WINDOWS ? { emissive: 0xb89a4a } : {}),
+  );
   m.position.set(x, y, z);
   m.castShadow = true;
   return withOutline(m, 0.08);
@@ -30,8 +37,8 @@ const wheels = (g: THREE.Group, width: number, length: number, r: number, axles?
 };
 
 /** Glass pane on the front (+1) or rear (-1) face of a body ending at `zFace`. */
-const pane = (w: number, h: number, y: number, zFace: number, side: 1 | -1): THREE.Group =>
-  part(w, h, 0.06, GLASS, 0, y, zFace + side * 0.03);
+const pane = (w: number, h: number, y: number, zFace: number, side: 1 | -1, color = GLASS): THREE.Group =>
+  part(w, h, 0.06, color, 0, y, zFace + side * 0.03);
 
 /** Pair of side windows (one per flank) centred at `z`. */
 const sideWindows = (g: THREE.Group, bodyW: number, d: number, h: number, y: number, z: number): void => {
@@ -94,12 +101,16 @@ const cab = (g: THREE.Group, w: number, h: number, l: number, depth: number, col
   g.add(part(w, 0.22, 0.2, DARK, 0, base - 0.05, l / 2 + 0.05));
 };
 
-/** Stylised traffic vehicle facing +Z, origin at ground centre. */
-export const buildVehicle = (kind: VehicleKind, variant: number): THREE.Group => {
+/**
+ * Stylised traffic vehicle facing +Z, origin at ground centre. At `night` the lamps shine, headlight beams and a red
+ * tail glow are drawn on the road and buses and trams show lit windows.
+ */
+export const buildVehicle = (kind: VehicleKind, variant: number, night = false): THREE.Group => {
   const def = VEHICLES[kind];
   const { width: w, length: l, height: h } = def;
   const g = new THREE.Group();
   const color = PALETTE[variant % PALETTE.length]!;
+  const cabin = night ? LIT_WINDOWS : GLASS;
   switch (kind) {
     case 'car':
     case 'taxi':
@@ -141,13 +152,13 @@ export const buildVehicle = (kind: VehicleKind, variant: number): THREE.Group =>
     case 'bus': {
       const base = 0.4;
       g.add(part(w, h * 0.85, l, 0xff9f1c, 0, base + h * 0.42, 0));
-      g.add(part(w + 0.02, h * 0.28, l * 0.92, GLASS, 0, base + h * 0.58, 0));
+      g.add(part(w + 0.02, h * 0.28, l * 0.92, cabin, 0, base + h * 0.58, 0));
       // Big front windscreen with destination sign, and a rear window.
-      g.add(pane(w * 0.9, h * 0.42, base + h * 0.5, l / 2, 1));
+      g.add(pane(w * 0.9, h * 0.42, base + h * 0.5, l / 2, 1, cabin));
       g.add(part(w * 0.7, h * 0.08, 0.07, 0xffd166, 0, base + h * 0.77, l / 2 + 0.04));
-      g.add(pane(w * 0.8, h * 0.24, base + h * 0.6, -l / 2, -1));
+      g.add(pane(w * 0.8, h * 0.24, base + h * 0.6, -l / 2, -1, cabin));
       // Doors on the kerb (right, -X) side, a roof A/C unit and bumpers.
-      for (const z of [l / 2 - 1, -0.6]) g.add(part(0.06, h * 0.62, 1.1, GLASS, -w / 2 - 0.03, base + h * 0.33, z));
+      for (const z of [l / 2 - 1, -0.6]) g.add(part(0.06, h * 0.62, 1.1, cabin, -w / 2 - 0.03, base + h * 0.33, z));
       g.add(part(w * 0.6, 0.3, l * 0.25, 0xe9ecef, 0, base + h * 0.85 + 0.15, -l * 0.1));
       for (const side of [1, -1] as const) g.add(part(w, 0.2, 0.15, DARK, 0, base + 0.05, side * (l / 2 - 0.02)));
       wheels(g, w, l, 0.5);
@@ -251,7 +262,7 @@ export const buildVehicle = (kind: VehicleKind, variant: number): THREE.Group =>
     case 'tram': {
       // Two-tone articulated tram with a pantograph.
       g.add(part(w, h * 0.35, l, 0xf4a261, 0, 0.3 + h * 0.18, 0));
-      g.add(part(w + 0.02, h * 0.3, l * 0.96, GLASS, 0, 0.3 + h * 0.5, 0));
+      g.add(part(w + 0.02, h * 0.3, l * 0.96, cabin, 0, 0.3 + h * 0.5, 0));
       g.add(part(w, h * 0.15, l, 0xfff1d0, 0, 0.3 + h * 0.72, 0));
       g.add(part(1.4, 0.12, 0.12, 0x333333, 0, h + 0.6, 0));
       g.add(part(0.08, 0.7, 0.08, 0x333333, 0, h + 0.3, 0));
@@ -262,11 +273,23 @@ export const buildVehicle = (kind: VehicleKind, variant: number): THREE.Group =>
   // Tail/head lights.
   const lightGeo = new THREE.BoxGeometry(0.3, 0.15, 0.05);
   for (const x of [-w / 2 + 0.3, w / 2 - 0.3]) {
-    const head = new THREE.Mesh(lightGeo, toon(0xfff3b0, { emissive: 0x665f30 }));
+    const head = new THREE.Mesh(lightGeo, toon(0xfff3b0, { emissive: night ? 0xfff3b0 : 0x665f30 }));
     head.position.set(x, 0.75, l / 2 + 0.02);
-    const tail = new THREE.Mesh(lightGeo, toon(0xff2233, { emissive: 0x550000 }));
+    const tail = new THREE.Mesh(lightGeo, toon(0xff2233, { emissive: night ? 0xff2233 : 0x550000 }));
     tail.position.set(x, 0.75, -l / 2 - 0.02);
     g.add(head, tail);
+  }
+  if (night) {
+    const beam = new THREE.Mesh(beamGeometry(w * 0.8, w * 2.2, 11, 0.55), glowMaterial(HEADLIGHT));
+    beam.position.set(0, 0.06, l / 2);
+    const tail = new THREE.Mesh(poolGeometry(w * 0.6, 0.45), glowMaterial(TAIL_LIGHT));
+    tail.scale.z = 0.6;
+    tail.position.set(0, 0.06, -l / 2 - 0.4);
+    for (const m of [beam, tail]) {
+      m.name = 'nightGlow';
+      m.renderOrder = 1;
+      g.add(m);
+    }
   }
   return g;
 };

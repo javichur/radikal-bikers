@@ -15,6 +15,7 @@ import {
   type Obstacle,
 } from './landmarks';
 import { toon, withOutline } from './materials';
+import { coneGeometry, glowInstances, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import {
   buildCrossing,
   buildSea,
@@ -31,7 +32,7 @@ import {
   stripeTexture,
   tntTexture,
   turboTexture,
-  windowTexture,
+  windowTextures,
 } from './textures';
 import { inRanges, ribbon, segments, sweep, wall } from './trackGeometry';
 
@@ -124,6 +125,7 @@ export const buildCity = (world: World): CityScene => {
   const rng = new Rng(stage.seed);
   const look = LOOKS[stage.scenery];
   const mix = stage.trafficMix ?? DEFAULT_TRAFFIC_MIX;
+  const night = stage.theme.night ?? false;
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), toon(stage.theme.ground));
   ground.rotation.x = -Math.PI / 2;
@@ -210,9 +212,13 @@ export const buildCity = (world: World): CityScene => {
   const bGeo = new THREE.BoxGeometry(1, 1, 1);
   bGeo.translate(0, 0.5, 0);
   const maxBuildings = Math.ceil(L / 8) * 2 + 400;
+  const facade = look.sheds ? { map: shedTexture(), glow: null } : windowTextures();
   const buildings = new THREE.InstancedMesh(
     bGeo,
-    toon(0xffffff, { map: look.sheds ? shedTexture() : windowTexture() }),
+    toon(
+      0xffffff,
+      night && facade.glow ? { map: facade.map, emissive: 0xffffff, emissiveMap: facade.glow } : { map: facade.map },
+    ),
     maxBuildings,
   );
   buildings.castShadow = true;
@@ -271,6 +277,8 @@ export const buildCity = (world: World): CityScene => {
   let count = 0;
   const propsTrees: THREE.Matrix4[] = [];
   const propsLamps: THREE.Matrix4[] = [];
+  /** Light pools on the road next to each street lamp (night only). */
+  const lampPools: THREE.Matrix4[] = [];
   const placeRow = (row: BuildingRow): void => {
     const t = world.trackOf(row.route);
     const side = Math.sign(row.offset);
@@ -316,6 +324,8 @@ export const buildCity = (world: World): CityScene => {
       const mat = new THREE.Matrix4().makeTranslation(pp.x, pp.y + 0.2, pp.z);
       const tree = !onBridge && rng.next() < look.treeChance;
       if (tree || !look.guardrails) (tree ? propsTrees : propsLamps).push(mat);
+      if (night && !tree && !look.guardrails)
+        lampPools.push(poolMatrix(track.toWorld(s, side * (hw - 0.5)), track.sample(s).slope));
     }
   }
   rows.forEach((r) => placeRow({ ...r, minHeight: look.routeHeight[0], maxHeight: look.routeHeight[1] }));
@@ -338,12 +348,22 @@ export const buildCity = (world: World): CityScene => {
   const bulbGeo = new THREE.SphereGeometry(0.3, 8, 6);
   bulbGeo.translate(0, 5.1, 0);
   const poles = new THREE.InstancedMesh(poleGeo, toon(0x495057), propsLamps.length);
-  const bulbs = new THREE.InstancedMesh(bulbGeo, toon(0xfff3b0, { emissive: 0x80704a }), propsLamps.length);
+  const bulbs = new THREE.InstancedMesh(
+    bulbGeo,
+    toon(0xfff3b0, { emissive: night ? 0xfff3b0 : 0x80704a }),
+    propsLamps.length,
+  );
   propsLamps.forEach((mt, i) => {
     poles.setMatrixAt(i, mt);
     bulbs.setMatrixAt(i, mt);
   });
   root.add(trunks, crowns, poles, bulbs);
+  if (night) {
+    root.add(
+      glowInstances(coneGeometry(0.3, 3.2, 5, 0.22), LAMP_LIGHT, propsLamps),
+      glowInstances(poolGeometry(5, 0.5), LAMP_LIGHT, lampPools),
+    );
+  }
 
   // Beach umbrellas on the sand between the road and the sea.
   if (sea) {

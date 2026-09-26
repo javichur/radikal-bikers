@@ -17,9 +17,9 @@ const cache = new Map<string, THREE.MeshToonMaterial>();
 
 export const toon = (
   color: number,
-  opts: { map?: THREE.Texture; emissive?: number; side?: THREE.Side } = {},
+  opts: { map?: THREE.Texture; emissive?: number; emissiveMap?: THREE.Texture; side?: THREE.Side } = {},
 ): THREE.MeshToonMaterial => {
-  const key = `${color}:${opts.map?.uuid ?? ''}:${opts.emissive ?? ''}:${opts.side ?? ''}`;
+  const key = `${color}:${opts.map?.uuid ?? ''}:${opts.emissive ?? ''}:${opts.emissiveMap?.uuid ?? ''}:${opts.side ?? ''}`;
   let m = cache.get(key);
   if (!m) {
     m = new THREE.MeshToonMaterial({
@@ -29,6 +29,7 @@ export const toon = (
       side: opts.side ?? THREE.FrontSide,
     });
     if (opts.emissive !== undefined) m.emissive = new THREE.Color(opts.emissive);
+    if (opts.emissiveMap) m.emissiveMap = opts.emissiveMap;
     cache.set(key, m);
   }
   return m;
