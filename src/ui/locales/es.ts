@@ -76,7 +76,7 @@ export const es = {
   'stage.harborNight.desc': 'Las mismas calles de noche: más tráfico, más obras y Nitro esperándote en la salida.',
   'stage.valencia.name': 'València',
   'stage.valencia.desc':
-    'En plenas Fallas: de la Ciutat de les Arts por el Túria, el Pont de Serrans y las Torres, cruzando Ciutat Vella hasta Colón y la Porta de la Mar.',
+    'En plenas Fallas: de la Ciutat de les Arts por el Túria, el Pont de Serrans y las Torres, por las estrechas calles de Ciutat Vella (Carme, Mercat Central, Llotja) hasta Colón, la Porta de la Mar y la Plaça de Tetuan.',
   'stage.shortcutsFound': 'Atajos descubiertos',
   'stage.locked': 'Consigue {n} ★ para desbloquear',
   'stage.challenges': 'Retos',
