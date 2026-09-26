@@ -87,10 +87,14 @@ export class Game {
       passive: true,
       signal: this.listeners.signal,
     });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.flow.screen === 'racing') this.onMenu('pause');
-      if (!document.hidden) void this.updates?.check();
-    }, { signal: this.listeners.signal });
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.hidden && this.flow.screen === 'racing') this.onMenu('pause');
+        if (!document.hidden) void this.updates?.check();
+      },
+      { signal: this.listeners.signal },
+    );
 
     if (!import.meta.env.DEV && !params.has('e2e')) {
       this.updates = new UpdateChecker({
@@ -100,9 +104,13 @@ export class Game {
         reload: () => location.reload(),
         storage: safeSessionStorage(),
       });
-      window.addEventListener('pageshow', (e) => {
-        if (e.persisted) void this.updates?.check();
-      }, { signal: this.listeners.signal });
+      window.addEventListener(
+        'pageshow',
+        (e) => {
+          if (e.persisted) void this.updates?.check();
+        },
+        { signal: this.listeners.signal },
+      );
       void this.updates.check();
     }
 
