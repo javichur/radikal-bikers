@@ -193,7 +193,9 @@ body {
 
 .card {
   --accent: var(--teal);
-  width: min(22rem, 42vw);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 22rem;
   padding: 0.9rem 1.1rem;
   border: 4px solid var(--ink);
   border-radius: 1rem;
@@ -224,6 +226,221 @@ body {
 .stage-card {
   --accent: var(--red);
   margin: 0 auto;
+}
+
+.stage-card.night {
+  --accent: #8d99ff;
+  background: rgb(222 226 255 / 0.94);
+}
+
+.select-screen,
+.result {
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.select-screen > :first-child,
+.result > :first-child {
+  margin-top: auto;
+}
+
+.select-screen > :last-child,
+.result > :last-child {
+  margin-bottom: auto;
+}
+
+.card.locked {
+  filter: grayscale(0.85);
+  opacity: 0.8;
+}
+
+.lock {
+  margin: 0.1rem 0;
+  font-weight: 900;
+  color: var(--red);
+}
+
+.stars {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #f4a100;
+  letter-spacing: 0.1em;
+  -webkit-text-stroke: 1px var(--ink);
+}
+
+.challenges {
+  list-style: none;
+  margin: 0.2rem 0;
+  padding: 0;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.challenges li {
+  margin: 0.15rem 0;
+  opacity: 0.75;
+}
+
+.challenges li.done {
+  opacity: 1;
+  font-weight: 700;
+}
+
+.challenges .star {
+  color: #f4a100;
+}
+
+.challenges .tag {
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  border-radius: 0.4rem;
+  background: var(--teal);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.modal .challenges {
+  color: var(--paper);
+}
+
+.paints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.swatches {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  font-size: 0.6rem;
+}
+
+.swatch.on {
+  outline: 3px solid var(--yellow);
+}
+
+.swatch.locked {
+  opacity: 0.45;
+}
+
+.paints .hint {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.profile {
+  padding: 0.4rem 1rem;
+  border: 3px solid var(--ink);
+  border-radius: 0.8rem;
+  background: rgb(255 248 231 / 0.9);
+  color: var(--ink);
+}
+
+.profile p {
+  margin: 0.15rem 0;
+}
+
+.rank {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.profile-stats {
+  font-size: 0.8rem;
+}
+
+.xp-bar {
+  display: inline-block;
+  width: 8rem;
+  height: 0.6rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #ddd;
+  vertical-align: middle;
+}
+
+.xp-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), var(--yellow));
+}
+
+.xp {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  font-weight: 900;
+  color: var(--yellow);
+}
+
+.grade {
+  font-size: 5rem;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  color: var(--paper);
+  text-shadow: 5px 5px 0 var(--ink);
+  -webkit-text-stroke: 2px var(--ink);
+  animation: grade-in 0.5s cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+
+.grade-S {
+  color: var(--yellow);
+}
+
+.grade-A {
+  color: var(--teal);
+}
+
+.grade-B {
+  color: #8d99ff;
+}
+
+@keyframes grade-in {
+  from {
+    transform: scale(3) rotate(-15deg);
+    opacity: 0;
+  }
+}
+
+.result p {
+  margin: 0.15rem 0;
+}
+
+.result .ahead {
+  color: var(--teal);
+  font-weight: 900;
+}
+
+.result .behind,
+.to-best {
+  color: #ffadad;
+  font-weight: 700;
+}
+
+.level-up,
+.unlocked {
+  color: var(--yellow);
+  font-weight: 900;
+  font-size: 1.2rem;
 }
 
 .bio,
@@ -375,6 +592,201 @@ body {
   height: 100%;
   width: 0;
   background: linear-gradient(90deg, var(--teal), var(--yellow));
+}
+
+.hud-progress-ghost,
+.hud-progress-rival {
+  position: absolute;
+  top: -1px;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-left: -0.35rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  display: none;
+}
+
+.hud-progress-ghost {
+  background: rgb(155 246 255 / 0.8);
+}
+
+.hud-progress-rival {
+  background: var(--red);
+}
+
+.hud-progress-ghost.show,
+.hud-progress-rival.show {
+  display: block;
+}
+
+.hud-rival,
+.hud-split {
+  margin-top: 0.3rem;
+  text-align: center;
+  font-size: 0.95rem;
+  display: none;
+}
+
+.hud-rival.show,
+.hud-split.show {
+  display: block;
+}
+
+.hud-rival {
+  color: #ffadad;
+}
+
+.hud-rival.leading {
+  color: var(--yellow);
+}
+
+.hud-split {
+  font-size: 1.4rem;
+}
+
+.hud-split.ahead {
+  color: #7cff6b;
+}
+
+.hud-split.behind {
+  color: var(--red);
+}
+
+.hud-record {
+  display: none;
+  font-size: 0.8rem;
+  color: #ffadad;
+}
+
+.hud-record.show {
+  display: block;
+}
+
+.hud-record.beaten {
+  color: #7cff6b;
+}
+
+.hud-combo {
+  position: absolute;
+  left: calc(1rem + var(--safe-l));
+  top: 30%;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 0.5rem;
+  align-items: baseline;
+  opacity: 0;
+  transform: translateX(-120%);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+}
+
+.hud-combo.show {
+  opacity: 1;
+  transform: none;
+}
+
+.hud-combo-label {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  color: var(--paper);
+}
+
+.hud-combo-mult {
+  font-size: 2.6rem;
+  font-style: italic;
+  color: var(--yellow);
+}
+
+.hud-combo[data-mult='3'] .hud-combo-mult,
+.hud-combo[data-mult='4'] .hud-combo-mult {
+  color: #ff7b00;
+}
+
+.hud-combo[data-mult='5'] .hud-combo-mult {
+  color: var(--red);
+  animation: hud-blink 0.4s steps(2) infinite;
+}
+
+.hud-combo-points {
+  font-size: 1.3rem;
+  color: var(--paper);
+}
+
+.hud-combo-bar {
+  grid-column: 1 / -1;
+  width: 8rem;
+  height: 0.4rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.4);
+}
+
+.hud-combo-fill {
+  display: block;
+  height: 100%;
+  background: var(--yellow);
+}
+
+.hud-trick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 40%;
+  text-align: center;
+  font-size: clamp(1rem, 3vw, 1.6rem);
+  font-style: italic;
+  text-transform: uppercase;
+  color: var(--paper);
+  opacity: 0;
+  transform: translateY(0.6rem);
+  transition:
+    opacity 0.1s,
+    transform 0.2s;
+}
+
+.hud-trick.show {
+  opacity: 1;
+  transform: none;
+}
+
+.hud-trick.m2 {
+  color: var(--yellow);
+}
+
+.hud-trick.m3,
+.hud-trick.m4 {
+  color: #ff7b00;
+}
+
+.hud-trick.m5 {
+  color: var(--red);
+}
+
+.hud-trick.lost {
+  color: #adb5bd;
+}
+
+.hud-speedlines {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 45%,
+    rgb(255 255 255 / 0.28) 0deg 0.6deg,
+    transparent 0.6deg 7deg
+  );
+  -webkit-mask-image: radial-gradient(ellipse at 50% 45%, transparent 35%, #000 75%);
+  mask-image: radial-gradient(ellipse at 50% 45%, transparent 35%, #000 75%);
+  animation: speedlines 0.25s linear infinite;
+}
+
+@keyframes speedlines {
+  to {
+    transform: rotate(2deg);
+  }
 }
 
 .hud-progress-mark {
