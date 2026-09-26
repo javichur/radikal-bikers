@@ -36,10 +36,10 @@ src/
 | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | Aceleración | `a = accel · throttle · (1 − (v/vmax)³)`; rozamiento al soltar; frenada fuerte y marcha atrás lenta              |
 | Dirección   | Velocidad de giro ∝ manejo, reducida a baja velocidad, con caballito (×0.45) y en el aire (×0.2)                 |
-| Caballito   | Requiere > 6 m/s; +12 % de velocidad punta; máximo 3 s y luego 1,5 s de enfriamiento                             |
+| Caballito   | Requiere > 6 m/s; +12 % de velocidad punta; máximo 3 s y luego 1,5 s de enfriamiento; salta por encima de vehículos |
 | Rampas      | Impulso vertical ∝ velocidad (+ extra con caballito); aterrizar muy cruzado provoca caída                        |
 | Muros       | Roce con pérdida de velocidad (menor cuanto más peso); impacto lateral > 9 m/s = rebote y −25 % de velocidad     |
-| Tráfico     | Choque frontal/alcance con velocidad relativa > 4 m/s = caída; roce lateral = rebote; se puede saltar por encima |
+| Tráfico     | Choque frontal/alcance con velocidad relativa > 4 m/s = caída (con caballito, la moto salta por encima); roce lateral = rebote; se puede saltar por encima |
 | Explosivo   | Con el bonus activo, los vehículos golpeados explotan y el piloto nunca se cae                                   |
 | Escaparates | Romper los cristales resta un 15 % de velocidad, sin caída                                                       |
 | Caída       | 2,2 s en el suelo, reaparición en un carril libre con 1,6 s de invulnerabilidad                                  |

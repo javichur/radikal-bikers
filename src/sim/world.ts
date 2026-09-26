@@ -3,7 +3,7 @@ import type { CharacterDef } from '../content/characters';
 import type { StageDef } from '../content/stages';
 import type { ControlState } from '../input/types';
 import { wrapAngle } from '../core/math';
-import { BIKE, crashBike, createBike, landBike, launchBike, stepBike, type BikeState } from './bike';
+import { BIKE, canHop, crashBike, hopBike, createBike, landBike, launchBike, stepBike, type BikeState } from './bike';
 import type { SimEvent } from './events';
 import {
   computeScore,
@@ -243,13 +243,27 @@ export class World {
 
   private resolveTrafficCollisions(events: SimEvent[]): void {
     const b = this.bike;
-    if (b.crashTimer > 0 || b.invulnerable > 0) return;
+    if (b.crashTimer > 0 || b.invulnerable > 0) {
+      b.hopOver = -1;
+      return;
+    }
     const bikeBox = { s: b.s, d: b.d, halfLength: BIKE.length / 2, halfWidth: BIKE.width / 2 };
     const vehicles = this.traffic.vehicles;
+    let hopping = false;
     for (let i = vehicles.length - 1; i >= 0; i--) {
       const v = vehicles[i]!;
-      if (b.height > v.height) continue; // jumped over it!
       const vBox = { s: v.s, d: v.d, halfLength: v.length / 2, halfWidth: v.width / 2 };
+      if (v.id === b.hopOver && overlaps(bikeBox, vBox)) {
+        // Wheelie hop in progress: keep the bike above the roof until it has cleared the vehicle.
+        hopping = true;
+        if (b.height <= v.height) {
+          b.height = v.height + 0.05;
+          b.vy = Math.max(0, b.vy);
+          b.airborne = true;
+        }
+        continue;
+      }
+      if (b.height > v.height) continue; // jumped over it!
       if (!overlaps(bikeBox, vBox)) continue;
       if (b.explosive > 0) {
         // Explosive bonus: the vehicle blows up and the rider ploughs on.
@@ -277,6 +291,12 @@ export class World {
         continue;
       }
       const closing = (b.speed * Math.cos(b.yaw) - v.speed * v.dir) * sideS;
+      if (closing > BUMP_SPEED && canHop(b)) {
+        // Riding a wheelie into a vehicle: the front wheel climbs it and the bike hops over.
+        hopBike(b, v.id, v.height, v.length + BIKE.length, closing, events);
+        hopping = true;
+        continue;
+      }
       if (closing > BUMP_SPEED) {
         crashBike(b, 'vehicle', events);
         return;
@@ -286,6 +306,7 @@ export class World {
       b.s = v.s - sideS * (vBox.halfLength + bikeBox.halfLength + 0.05);
       events.push({ type: 'scrape' });
     }
+    if (!hopping) b.hopOver = -1;
   }
 
   /** After a crash, drop the rider on a lane that's free of traffic. */

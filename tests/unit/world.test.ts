@@ -92,6 +92,64 @@ describe('World', () => {
     expect(events.some((e) => e.type === 'crash')).toBe(false);
   });
 
+  const parkedBus = (id: number, s: number, d: number) => ({
+    id,
+    kind: 'bus' as const,
+    s,
+    d,
+    dir: -1 as const,
+    speed: 0,
+    cruiseSpeed: 0,
+    length: 11,
+    width: 2.6,
+    height: 3.2,
+    honkCooldown: 99,
+    variant: 0,
+  });
+
+  it('hops over a vehicle instead of crashing when riding a wheelie into it', () => {
+    const w = newWorld();
+    w.traffic.vehicles.length = 0;
+    w.traffic.vehicles.push(parkedBus(99, 60, 3));
+    w.bike.s = 45;
+    w.bike.d = 3;
+    w.bike.speed = 25;
+    w.bike.wheelie = 1;
+    const events = run(w, 1.5, controls({ throttle: 1, wheelie: true }));
+    expect(events.some((e) => e.type === 'crash')).toBe(false);
+    expect(events.some((e) => e.type === 'jump')).toBe(true);
+    expect(w.bike.s).toBeGreaterThan(60 + 11 / 2);
+    expect(w.bike.crashes).toBe(0);
+  });
+
+  it('hops over a slow vehicle ahead from a wheelie, clearing its whole length', () => {
+    const w = newWorld();
+    w.traffic.vehicles.length = 0;
+    w.traffic.vehicles.push({ ...parkedBus(98, 60, 3), dir: 1, speed: 8, cruiseSpeed: 8 });
+    w.bike.s = 50;
+    w.bike.d = 3;
+    w.bike.speed = 14;
+    w.bike.wheelie = 1;
+    const events = run(w, 4, controls({ throttle: 1, wheelie: true }));
+    expect(events.some((e) => e.type === 'crash')).toBe(false);
+    const bus = w.traffic.vehicles.find((v) => v.id === 98)!;
+    expect(w.bike.s).toBeGreaterThan(bus.s + bus.length / 2);
+  });
+
+  it('still explodes vehicles with the bomb even while riding a wheelie', () => {
+    const w = newWorld();
+    w.traffic.vehicles.length = 0;
+    w.traffic.vehicles.push(parkedBus(97, 60, 3));
+    w.bike.s = 45;
+    w.bike.d = 3;
+    w.bike.speed = 25;
+    w.bike.wheelie = 1;
+    w.bike.explosive = BIKE.explosiveDuration;
+    const events = run(w, 1, controls({ throttle: 1, wheelie: true }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'explode', vehicleId: 97 }));
+    expect(events.some((e) => e.type === 'crash')).toBe(false);
+  });
+
   it('continue restarts from the last checkpoint with a fresh clock', () => {
     const w = newWorld();
     w.bike.s = w.rules.checkpoints[0]!.s + 10;

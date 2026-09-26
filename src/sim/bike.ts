@@ -33,6 +33,11 @@ export const BIKE = {
   slopeFactor: 0.45,
   /** Seconds the explosive bonus lasts. */
   explosiveDuration: 8,
+  /** Minimum wheelie amount needed to hop over a vehicle instead of crashing into it. */
+  wheelieHopMin: 0.5,
+  /** Take-off vertical speed range when hopping over a vehicle from a wheelie. */
+  hopMinVy: 3,
+  hopMaxVy: 8,
 } as const;
 
 export interface BikeState {
@@ -60,6 +65,8 @@ export interface BikeState {
   route: number;
   /** > 0 while the explosive bonus is active: vehicles hit blow up instead of knocking the rider down. */
   explosive: number;
+  /** Id of the vehicle the bike is hopping over from a wheelie (-1 = none). */
+  hopOver: number;
 }
 
 export const createBike = (s = 0, d = 3): BikeState => ({
@@ -79,6 +86,7 @@ export const createBike = (s = 0, d = 3): BikeState => ({
   crashes: 0,
   route: -1,
   explosive: 0,
+  hopOver: -1,
 });
 
 export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
@@ -94,6 +102,7 @@ export const crashBike = (b: BikeState, cause: 'vehicle' | 'landing', events: Si
   b.crashes++;
   b.wheelie = 0;
   b.wheelieTime = 0;
+  b.hopOver = -1;
   events.push({ type: 'crash', cause });
 };
 
@@ -101,6 +110,30 @@ export const launchBike = (b: BikeState, events: SimEvent[]): void => {
   if (b.airborne || b.speed < 5 || b.crashTimer > 0) return;
   b.airborne = true;
   b.vy = b.speed * BIKE.rampLaunchFactor + (b.wheelie > 0.5 ? 2 : 0);
+  events.push({ type: 'jump' });
+};
+
+/** True when a wheelie is high enough to hop over a vehicle instead of crashing into it. */
+export const canHop = (b: BikeState): boolean =>
+  b.wheelie >= BIKE.wheelieHopMin && !b.airborne && b.crashTimer <= 0;
+
+/**
+ * Pops the bike over a vehicle from a wheelie: it lifts onto the vehicle's roof line and
+ * gets enough vertical speed to clear it at the given closing speed.
+ */
+export const hopBike = (
+  b: BikeState,
+  vehicleId: number,
+  vehicleHeight: number,
+  crossLength: number,
+  closing: number,
+  events: SimEvent[],
+): void => {
+  const crossTime = crossLength / Math.max(closing, 1);
+  b.airborne = true;
+  b.height = Math.max(b.height, vehicleHeight + 0.05);
+  b.vy = clamp((BIKE.gravity * crossTime) / 2, BIKE.hopMinVy, BIKE.hopMaxVy);
+  b.hopOver = vehicleId;
   events.push({ type: 'jump' });
 };
 
