@@ -45,6 +45,21 @@ export const inRiver = (r: River, x: number, z: number, margin = 0): boolean => 
   return Math.abs(along) < r.halfWidth + margin && Math.abs(across) < r.halfLength + margin;
 };
 
+/** Corners of the river strip (world XZ). */
+export const riverCorners = (r: River): [number, number][] => {
+  const ax = Math.sin(r.heading);
+  const az = Math.cos(r.heading);
+  return [
+    [-1, -1],
+    [-1, 1],
+    [1, 1],
+    [1, -1],
+  ].map(([u, v]) => [
+    r.x + u! * r.halfWidth * ax - v! * r.halfLength * az,
+    r.z + u! * r.halfWidth * az + v! * r.halfLength * ax,
+  ]);
+};
+
 export const RAIL_HALF_LENGTH = 300;
 
 /** Railway of a level crossing, as a straight strip across the road (same shape as a river). */
@@ -80,3 +95,15 @@ export const polygonDistance = (poly: Polygon, x: number, z: number): number => 
   }
   return best;
 };
+
+/** Sunken riverbed (the Jardí del Túria): the parks and rivers lie `depth` metres below the streets. */
+export interface Riverbed {
+  readonly depth: number;
+  /** Whether a world XZ point lies on the sunken floor. */
+  readonly sunk: (x: number, z: number) => boolean;
+}
+
+export const riverbedOf = (depth: number, parks: readonly Polygon[], rivers: readonly River[]): Riverbed => ({
+  depth,
+  sunk: (x, z) => parks.some((p) => inPolygon(p, x, z)) || rivers.some((r) => inRiver(r, x, z)),
+});

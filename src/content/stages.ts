@@ -80,6 +80,11 @@ export interface StageDef {
   readonly sea?: readonly (readonly [number, number])[];
   /** Park polygons (world XZ): sunken gardens kept clear of buildings; the main road only enters them on bridges. */
   readonly parks?: readonly (readonly (readonly [number, number])[])[];
+  /**
+   * Depth (m) of the old riverbed holding the parks and rivers (the Jardí del Túria): their floor lies that far below
+   * the streets and the shortcuts crossing them ramp down to it. Flat when omitted.
+   */
+  readonly riverbedDepth?: number;
   /** Landmark buildings beside the road (`at` = course fraction, `d` = lateral offset of their centre). */
   readonly monuments?: readonly { readonly at: number; readonly d: number; readonly kind: MonumentKind }[];
   /** Target amount of traffic vehicles around the player. */
@@ -311,6 +316,9 @@ export const STAGES: readonly StageDef[] = [
       { at: 0.9308, d: 136, kind: 'mercatColon' },
       { at: 0.9581, d: 32, kind: 'portaMar' },
     ],
+    // The Túria was diverted after the 1957 flood; its bed, walled in stone some 5 m below the streets, is now a
+    // 9 km garden.
+    riverbedDepth: 5,
     // Jardí del Túria: the old riverbed turned into a sunken park, from the Ciutat de les Arts to the Pont de la
     // Trinitat (offset of the bank road; the Assut de l'Or crosses the ponds of the Ciutat de les Arts).
     parks: [

@@ -32,6 +32,7 @@ import { createRival, stepRival, type RivalState } from './rival';
 import { buildCones, CONE_RADIUS, laneClosed, pickWorkZones, type Cone, type WorkZone } from './roadworks';
 import { halfWidthAt, laneFits, narrowClosures, narrowsOf, reachesNarrow, type Narrow } from './roadWidth';
 import { buildRoute, ROUTE_HALF_WIDTH, routeToMainS, type Route } from './shortcuts';
+import { riverbedOf, riverOf, type Riverbed } from './scenery';
 import { Track } from './track';
 import { overlaps, Traffic, TRAFFIC_AHEAD, type Box, type Vehicle } from './traffic';
 
@@ -120,6 +121,8 @@ export class World {
   readonly zones: readonly WorkZone[];
   /** Narrow streets of the main road. */
   readonly narrows: readonly Narrow[];
+  /** Sunken riverbed holding the parks and rivers (null when the stage is flat). */
+  readonly riverbed: Riverbed | null;
   /** Lanes closed to traffic: roadworks plus the outer lanes of narrow streets. */
   readonly closures: readonly WorkZone[];
   readonly cones: readonly Cone[];
@@ -157,7 +160,16 @@ export class World {
     this.rules = rulesFromStage(stage, this.track.length);
     this.ramps = stage.ramps.map((r) => ({ s: r.at * this.track.length, d: r.d, width: r.width }));
     this.narrows = narrowsOf(stage, this.track.length);
-    this.routes = stage.shortcuts.map((def, i) => buildRoute(this.track, (s) => this.halfWidthAt(s), def, i));
+    this.riverbed = stage.riverbedDepth
+      ? riverbedOf(
+          stage.riverbedDepth,
+          stage.parks ?? [],
+          stage.bridges.map((b) => riverOf(this.track, b)),
+        )
+      : null;
+    this.routes = stage.shortcuts.map((def, i) =>
+      buildRoute(this.track, (s) => this.halfWidthAt(s), def, i, this.riverbed),
+    );
     this.pickups = stage.pickups.map((p) => ({
       kind: p.kind ?? 'explosive',
       route: p.route,

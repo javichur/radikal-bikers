@@ -232,6 +232,27 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
     }
   });
 
+  it('shortcuts dive to the floor of a sunken riverbed and stay at street level elsewhere', () => {
+    const bed = w.riverbed;
+    for (const r of w.routes) {
+      for (let s = 0; s <= r.track.length; s += 1) {
+        const p = r.track.sample(s);
+        if (!bed || !r.sunken || s < r.sunken.from || s > r.sunken.to) {
+          expect(Math.abs(p.y - w.track.heightAt(r.fromS))).toBeLessThan(0.5);
+        } else {
+          // Below the streets only inside the bed, and on its floor away from the ramps.
+          expect(p.y).toBeLessThanOrEqual(0.01);
+          expect(p.y).toBeGreaterThanOrEqual(-bed.depth - 0.01);
+          if (p.y < -0.5) expect(bed.sunk(p.x, p.z)).toBe(true);
+        }
+      }
+    }
+    if (stage.id === 'valencia') {
+      expect(bed?.depth).toBe(5);
+      expect(w.routes.filter((r) => r.sunken).length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('keeps monuments off the roads (city gates stand over a covered section)', () => {
     for (const m of stage.monuments ?? []) {
       const def = MONUMENTS[m.kind];

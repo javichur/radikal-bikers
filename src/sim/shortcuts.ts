@@ -1,6 +1,7 @@
 import { lerp } from '../core/math';
 import type { ShortcutDef } from '../content/stages';
-import { Track } from './track';
+import type { Riverbed } from './scenery';
+import { Track, type ProfileKey } from './track';
 
 /** Half width of the drivable lane of a shortcut (alleys and shops). */
 export const ROUTE_HALF_WIDTH = 5;
@@ -46,9 +47,43 @@ export interface Route {
   readonly shops: readonly Range[];
   /** Lateral distance from the main road centre to the street front of each shop. */
   readonly shopFronts: readonly number[];
+  /** Route interval below the streets (ramps included), when it dives into a sunken riverbed. */
+  readonly sunken: Range | null;
 }
 
 type P3 = [number, number, number];
+
+/** Length of the ramps taking a shortcut down into a sunken riverbed and back up. */
+export const RIVERBED_RAMP = 35;
+
+/**
+ * Elevation keys taking a (flat) route down to the floor of the riverbed wherever it crosses it: the ramps start at
+ * the edge of the bed, so the route never dips below the streets. Null if the route stays on the streets.
+ */
+const sunkenStretch = (track: Track, riverbed: Riverbed): { keys: ProfileKey[]; range: Range } | null => {
+  let a = Infinity;
+  let b = -Infinity;
+  for (let s = 0; s <= track.length; s += 1) {
+    const p = track.sample(s);
+    if (!riverbed.sunk(p.x, p.z)) continue;
+    a = Math.min(a, s);
+    b = Math.max(b, s);
+  }
+  if (b - a < RIVERBED_RAMP * 2.5) return null;
+  const L = track.length;
+  const y0 = track.sample(0).y;
+  const y1 = track.sample(L).y;
+  const floor = -riverbed.depth;
+  const keys = [
+    { at: 0, y: y0 },
+    { at: a / L, y: y0 },
+    { at: (a + RIVERBED_RAMP) / L, y: floor },
+    { at: (b - RIVERBED_RAMP) / L, y: floor },
+    { at: b / L, y: y1 },
+    { at: 1, y: y1 },
+  ];
+  return { keys, range: { from: a, to: b } };
+};
 
 const facade = (hw: number): number => hw + SIDEWALK + FACADE_GAP;
 
@@ -56,7 +91,13 @@ const facade = (hw: number): number => hw + SIDEWALK + FACADE_GAP;
  * Builds the geometry of a shortcut from its definition relative to the main road, whose carriageway half width at
  * each distance is `hwAt` (narrow streets bring the facades, and the back streets behind them, closer).
  */
-export const buildRoute = (main: Track, hwAt: (s: number) => number, def: ShortcutDef, index: number): Route => {
+export const buildRoute = (
+  main: Track,
+  hwAt: (s: number) => number,
+  def: ShortcutDef,
+  index: number,
+  riverbed: Riverbed | null = null,
+): Route => {
   const s0 = def.from * main.length;
   const s1 = def.to * main.length;
   const side = def.side;
@@ -68,7 +109,7 @@ export const buildRoute = (main: Track, hwAt: (s: number) => number, def: Shortc
   const a = at(s0 + ALLEY_RUN, e(s0 + ALLEY_RUN) + ALLEY_OFFSET);
   const b = at(s1 - ALLEY_RUN, e(s1 - ALLEY_RUN) + ALLEY_OFFSET);
   const chord: P3[] = [1, 2, 3].map((k) => [lerp(a[0], b[0], k / 4), lerp(a[1], b[1], k / 4), lerp(a[2], b[2], k / 4)]);
-  const track = new Track([
+  const points = [
     at(s0, hwAt(s0) - 2),
     at(s0 + MOUTH_RUN, e(s0 + MOUTH_RUN) + SHOP_DEPTH / 2),
     a,
@@ -76,7 +117,10 @@ export const buildRoute = (main: Track, hwAt: (s: number) => number, def: Shortc
     b,
     at(s1 - MOUTH_RUN, e(s1 - MOUTH_RUN) + SHOP_DEPTH / 2),
     at(s1, hwAt(s1) - 2),
-  ]);
+  ];
+  const flat = new Track(points);
+  const dive = riverbed ? sunkenStretch(flat, riverbed) : null;
+  const track = dive ? new Track(points, 1, dive.keys) : flat;
 
   const toRoute = (s: number, d: number): { s: number; d: number } => {
     const p = main.toWorld(s, side * d);
@@ -153,6 +197,7 @@ export const buildRoute = (main: Track, hwAt: (s: number) => number, def: Shortc
     panes,
     shops,
     shopFronts,
+    sunken: dive?.range ?? null,
   };
 };
 

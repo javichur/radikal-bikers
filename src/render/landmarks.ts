@@ -4,6 +4,7 @@ import { GENERIC_SHOPS, VALENCIA_SHOPS, type ShopStyle } from '../content/shops'
 import type { River } from '../sim/scenery';
 import {
   FACADE_GAP,
+  RIVERBED_RAMP,
   ROUTE_HALF_WIDTH,
   routeToMainS,
   SHOP_DEPTH,
@@ -13,6 +14,7 @@ import {
 } from '../sim/shortcuts';
 import type { World } from '../sim/world';
 import { toon } from './materials';
+import { RIVERBED_WALL } from './riverbed';
 import { glowInstances, glowMaterial, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import { arcadeProfiles } from './sceneryStyle';
 import {
@@ -252,6 +254,36 @@ export const buildShortcut = (
     obstacles.push({ x: p.x, z: p.z, r: ROUTE_HALF_WIDTH + 1.4 });
   }
 
+  // Stone ramps down into a sunken riverbed: embankment walls from the floor up to the lane.
+  const bed = world.riverbed;
+  if (bed && route.sunken) {
+    const stone = toon(RIVERBED_WALL, { side: THREE.DoubleSide });
+    const { from: a, to: b } = route.sunken;
+    const E = ROUTE_HALF_WIDTH + 0.8;
+    for (const ramp of [
+      { from: a - 2, to: a + RIVERBED_RAMP },
+      { from: b - RIVERBED_RAMP, to: b + 2 },
+    ]) {
+      for (const k of [-1, 1]) {
+        const side = sweep(
+          t,
+          [
+            [k * E, -bed.depth],
+            [k * E, 0.02],
+          ],
+          ramp.from,
+          ramp.to,
+          1,
+          4,
+          [true, false],
+        );
+        root.add(new THREE.Mesh(side, stone));
+        const [d0, d1] = k < 0 ? [-E, -ROUTE_HALF_WIDTH] : [ROUTE_HALF_WIDTH, E];
+        root.add(new THREE.Mesh(ribbon(t, d0, d1, 0.02, 1, 4, ramp.from, ramp.to), stone));
+      }
+    }
+  }
+
   // Walkways and graffiti brick walls once the lane is behind the first row of buildings; wooden fences along a
   // country dirt track.
   const start = (s: number): number =>
@@ -476,8 +508,10 @@ export const buildBridge = (world: World, span: Range, root: THREE.Group): void 
     for (const k of [-1, 1]) {
       const p = t.toWorld(s, k * (hw - 2));
       const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-      pillar.position.set(p.x, -0.05, p.z);
-      pillar.scale.y = y - 1.9;
+      // Down to the floor of the riverbed when the bridge spans a sunken one.
+      const foot = world.riverbed?.sunk(p.x, p.z) ? -world.riverbed.depth : -0.05;
+      pillar.position.set(p.x, foot, p.z);
+      pillar.scale.y = y - 1.95 - foot;
       pillar.castShadow = true;
       root.add(pillar);
     }
@@ -491,9 +525,9 @@ export const buildBridge = (world: World, span: Range, root: THREE.Group): void 
 };
 
 /** River strip with stone banks and a couple of moored boats, or a dry riverbed laid out as a lawn. */
-export const buildRiver = (river: River, root: THREE.Group): void => {
+export const buildRiver = (river: River, root: THREE.Group, floor = 0): void => {
   const g = new THREE.Group();
-  g.position.set(river.x, 0, river.z);
+  g.position.set(river.x, floor, river.z);
   g.rotation.y = river.heading;
   const waterGeo = new THREE.PlaneGeometry(river.halfLength * 2, river.halfWidth * 2);
   waterGeo.rotateX(-Math.PI / 2);

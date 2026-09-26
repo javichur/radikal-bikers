@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Rng } from '../core/rng';
 import { MONUMENTS } from '../content/monuments';
 import { DEFAULT_TRAFFIC_MIX } from '../content/vehicles';
-import { inPolygon, inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
+import { inPolygon, inRiver, polygonDistance, railOf, riverCorners, riverOf } from '../sim/scenery';
 import { laneFits, NARROW_TAPER } from '../sim/roadWidth';
 import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
 import type { PickupKind } from '../sim/events';
@@ -19,6 +19,7 @@ import {
 } from './landmarks';
 import { toon, withOutline } from './materials';
 import { monumentModel } from './monuments';
+import { boundsOf, buildGround } from './riverbed';
 import { coneGeometry, glowInstances, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import {
   buildCrossing,
@@ -132,11 +133,13 @@ export const buildCity = (world: World): CityScene => {
   const mix = stage.trafficMix ?? DEFAULT_TRAFFIC_MIX;
   const night = stage.theme.night ?? false;
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), toon(stage.theme.ground));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.05;
-  ground.receiveShadow = true;
-  root.add(ground);
+  // Ground, with the old riverbed (parks and rivers) sunk below the streets when the stage has one.
+  const bed = world.riverbed;
+  const floorAt = (x: number, z: number): number => (bed?.sunk(x, z) ? -bed.depth : 0);
+  const bedCorners = bed
+    ? [...(stage.parks ?? []).flat(), ...stage.bridges.flatMap((b) => riverCorners(riverOf(track, b)))]
+    : [];
+  root.add(...buildGround(stage.theme.ground, PARK_GREEN, bed, boundsOf(bedCorners, 12)));
 
   // The city follows the carriageway where narrow streets squeeze it.
   const street = widened(track, (s) => world.halfWidthAt(s), hw);
@@ -229,12 +232,13 @@ export const buildCity = (world: World): CityScene => {
   const panes = routes.map((r) => buildShortcut(world, r, root, obstacles, rows, rng));
   tunnels.forEach((r) => buildTunnel(world, r, root, obstacles, look.tunnel));
   spans.forEach((s) => buildBridge(world, s, root));
-  stage.bridges.forEach((b) => buildRiver(riverOf(track, b), root));
+  stage.bridges.forEach((b) => buildRiver(riverOf(track, b), root, bed ? -bed.depth : 0));
   const crossings = world.crossings.map((c) => buildCrossing(track, c.s, hw, root));
   if (stage.sea) buildSea(stage.sea, root);
   const sea = stage.sea;
   const parks = stage.parks ?? [];
-  parks.forEach((poly) => buildPark(poly, PARK_GREEN, root));
+  // A sunken riverbed already paints its floor as lawn.
+  if (!bed) parks.forEach((poly) => buildPark(poly, PARK_GREEN, root));
   for (let s = 0; s <= L; s += 6) {
     const p = track.toWorld(s, 0);
     obstacles.push({ x: p.x, z: p.z, r: world.halfWidthAt(s) + SIDEWALK + 0.3 });
@@ -243,7 +247,8 @@ export const buildCity = (world: World): CityScene => {
   for (const mon of stage.monuments ?? []) {
     const p = track.toWorld(mon.at * L, mon.d);
     const g = monumentModel(mon.kind);
-    g.position.set(p.x, p.y + (mon.d === 0 ? 0 : -0.05), p.z);
+    const floor = floorAt(p.x, p.z);
+    g.position.set(p.x, floor < 0 ? floor : p.y + (mon.d === 0 ? 0 : -0.05), p.z);
     g.rotation.y = p.heading + Math.sign(mon.d) * (Math.PI / 2);
     root.add(g);
     obstacles.push({ x: p.x, z: p.z, r: MONUMENTS[mon.kind].radius });
@@ -446,7 +451,7 @@ export const buildCity = (world: World): CityScene => {
         const z = rng.range(z0, z1);
         if (!inPolygon(poly, x, z) || !pointFree(x, z, 2)) continue;
         const scale = new THREE.Vector3(1, rng.range(0.9, 1.5), 1);
-        palms.push(new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), scale));
+        palms.push(new THREE.Matrix4().compose(new THREE.Vector3(x, floorAt(x, z), z), new THREE.Quaternion(), scale));
       }
     }
     const trunks = new THREE.InstancedMesh(trunkGeo, toon(0x8d5524), palms.length);
