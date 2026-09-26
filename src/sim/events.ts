@@ -1,3 +1,5 @@
+export type TrickKind = 'nearMiss' | 'wheelie' | 'jump' | 'glass' | 'shortcut' | 'explode';
+
 export type SimEvent =
   | { readonly type: 'crash'; readonly cause: 'wall' | 'vehicle' | 'landing' }
   | { readonly type: 'respawn' }
@@ -13,4 +15,10 @@ export type SimEvent =
   | { readonly type: 'pickup'; readonly kind: 'explosive' }
   | { readonly type: 'explode'; readonly vehicleId: number; readonly s: number; readonly d: number }
   | { readonly type: 'glass'; readonly route: number; readonly pane: number }
-  | { readonly type: 'shortcut'; readonly route: number };
+  | { readonly type: 'shortcut'; readonly route: number }
+  | { readonly type: 'nearMiss'; readonly vehicleId: number }
+  | { readonly type: 'trick'; readonly kind: TrickKind; readonly points: number; readonly multiplier: number }
+  | { readonly type: 'comboBanked'; readonly points: number; readonly count: number }
+  | { readonly type: 'comboLost'; readonly points: number }
+  | { readonly type: 'cone'; readonly index: number }
+  | { readonly type: 'rivalPassed'; readonly ahead: boolean };

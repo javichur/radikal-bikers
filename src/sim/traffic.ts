@@ -18,6 +18,8 @@ export interface Vehicle {
   honkCooldown: number;
   /** Visual colour variant. */
   readonly variant: number;
+  /** Lane the vehicle is moving to (e.g. to get round roadworks). */
+  targetD?: number;
 }
 
 export interface TrafficConfig {
@@ -30,10 +32,14 @@ export interface TrafficConfig {
   readonly ahead?: number;
   /** No traffic is spawned before this distance (start grid). */
   readonly startClearance?: number;
+  /** Lanes closed by roadworks: vehicles don't spawn there and change lane before reaching them. */
+  readonly laneClosed?: (s: number, d: number, margin: number) => boolean;
 }
 
 const MIN_SPAWN_GAP = 22;
 const HONK_DISTANCE = 16;
+const LANE_CHANGE_SPEED = 4;
+const WORKS_LOOKAHEAD = 45;
 
 export class Traffic {
   readonly vehicles: Vehicle[] = [];
@@ -78,7 +84,7 @@ export class Traffic {
     if (lanes.length === 0) return null;
     const d = this.rng.pick(lanes);
     const blocked = this.vehicles.some((v) => v.d === d && Math.abs(v.s - s) < MIN_SPAWN_GAP);
-    if (blocked) return null;
+    if (blocked || this.cfg.laneClosed?.(s, d, MIN_SPAWN_GAP)) return null;
     const def = VEHICLES[this.pickKind()];
     const cruise = this.rng.range(def.minSpeed, def.maxSpeed);
     const v: Vehicle = {
@@ -104,7 +110,7 @@ export class Traffic {
     let best: Vehicle | null = null;
     let bestGap = Infinity;
     for (const o of this.vehicles) {
-      if (o === v || o.d !== v.d) continue;
+      if (o === v || Math.abs(o.d - v.d) > 1.5) continue;
       const gap = (o.s - v.s) * v.dir - (o.length + v.length) / 2;
       if (gap > -0.5 && gap < bestGap) {
         bestGap = gap;
@@ -112,6 +118,20 @@ export class Traffic {
       }
     }
     return best ? { vehicle: best, gap: bestGap } : null;
+  }
+
+  private avoidRoadworks(v: Vehicle, dt: number): void {
+    const closed = this.cfg.laneClosed;
+    if (!closed) return;
+    if (v.targetD === undefined && closed(v.s + (v.dir * WORKS_LOOKAHEAD) / 2, v.d, WORKS_LOOKAHEAD / 2)) {
+      const lanes = v.dir === 1 ? this.cfg.forwardLanes : this.cfg.oncomingLanes;
+      const free = lanes.filter((l) => l !== v.d && !closed(v.s, l, WORKS_LOOKAHEAD));
+      if (free.length) v.targetD = free.reduce((a, b) => (Math.abs(b - v.d) < Math.abs(a - v.d) ? b : a));
+    }
+    if (v.targetD !== undefined) {
+      v.d = approach(v.d, v.targetD, LANE_CHANGE_SPEED * dt);
+      if (v.d === v.targetD) delete v.targetD;
+    }
   }
 
   update(playerS: number, playerD: number, playerSpeed: number, dt: number, events: SimEvent[]): void {
@@ -137,6 +157,7 @@ export class Traffic {
       }
       v.speed = approach(v.speed, Math.max(0, target), (target < v.speed ? 12 : 3) * dt);
       v.s += v.speed * v.dir * dt;
+      this.avoidRoadworks(v, dt);
     }
 
     // Recycle vehicles that left the active window.

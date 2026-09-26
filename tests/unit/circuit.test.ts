@@ -253,9 +253,13 @@ describe('explosive bonus', () => {
     expect(events.some((e) => e.type === 'explode' && e.vehicleId === 77)).toBe(true);
     expect(events.some((e) => e.type === 'crash')).toBe(false);
     expect(w.traffic.vehicles.some((v) => v.id === 77)).toBe(false);
-    expect(w.race.bonusPoints).toBe(EXPLODE_POINTS);
+    expect(events).toContainEqual({ type: 'trick', kind: 'explode', points: EXPLODE_POINTS, multiplier: 1 });
+    expect(w.combo.pending).toBe(EXPLODE_POINTS);
 
-    run(w, BIKE.explosiveDuration, controls());
+    const later0 = run(w, BIKE.explosiveDuration, controls());
+    // The combo is banked once no other trick follows.
+    expect(later0.some((e) => e.type === 'comboBanked')).toBe(true);
+    expect(w.race.bonusPoints).toBe(EXPLODE_POINTS);
     expect(w.bike.explosive).toBe(0);
     w.traffic.vehicles.length = 0;
     w.traffic.vehicles.push(bus(w.bike.s + 12, w.bike.d));

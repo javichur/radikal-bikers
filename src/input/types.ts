@@ -10,7 +10,7 @@ export interface ControlState {
 }
 
 /** Edge-triggered menu/meta actions. */
-export type MenuAction = 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'pause';
+export type MenuAction = 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'pause' | 'restart';
 
 export interface InputSource {
   poll(): Partial<ControlState>;
