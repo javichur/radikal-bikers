@@ -4,9 +4,12 @@ import { OBSTACLES, type ObstacleKind } from '../content/obstacles';
 import type { SceneryStyle } from '../content/stages';
 import { BARRIER_OFFSET, RAIL_HALF_WIDTH, TRAIN_LENGTH } from '../sim/crossing';
 import { RAIL_HALF_LENGTH } from '../sim/scenery';
+import type { Range } from '../sim/shortcuts';
 import type { Track } from '../sim/track';
 import { toon, toonGradient, withOutline } from './materials';
 import { stripeTexture, waterTexture } from './textures';
+import { inRanges, sweep } from './trackGeometry';
+import { CONTACT_WIRE_HEIGHT } from './vehicleModel';
 
 /** Height of the barrier arm above the road. */
 const BARRIER_ARM_HEIGHT = 0.9;
@@ -37,6 +40,10 @@ export interface SceneryLook {
   readonly guardrails: boolean;
   /** Stacks of shipping containers among the buildings, and tower cranes. */
   readonly containers: boolean;
+  /** Look of the trams: modern articulated units or vintage two-car sets with a trolley pole. */
+  readonly tram: 'modern' | 'vintage';
+  /** Overhead contact wires, poles and span wires above the tram lanes. */
+  readonly catenary: boolean;
   /** Livery of the city buses. */
   readonly bus: number;
 }
@@ -59,6 +66,8 @@ const CITY: SceneryLook = {
   cobbles: false,
   guardrails: false,
   containers: false,
+  tram: 'modern',
+  catenary: false,
   bus: 0xff9f1c,
 };
 
@@ -78,6 +87,8 @@ export const LOOKS: Readonly<Record<SceneryStyle, SceneryLook>> = {
     treeChance: 0,
     tunnel: 'arcade',
     cobbles: true,
+    tram: 'vintage',
+    catenary: true,
   },
   industrial: {
     ...CITY,
@@ -199,6 +210,73 @@ export const buildPark = (poly: readonly (readonly [number, number])[], color: n
   park.position.y = -0.02;
   park.receiveShadow = true;
   root.add(park);
+};
+
+/**
+ * Tram catenary: a contact wire over each lane at `lanes` offsets, hung from span wires between pairs of cast-iron poles
+ * on the pavements every `spacing` metres. No poles where `skip` ranges (tunnels, side streets, gates) are.
+ */
+export const buildCatenary = (
+  track: Track,
+  lanes: readonly number[],
+  hw: number,
+  skip: readonly Range[],
+  root: THREE.Group,
+  spacing = 30,
+): THREE.Group => {
+  const H = CONTACT_WIRE_HEIGHT;
+  const g = new THREE.Group();
+  g.name = 'catenary';
+  const wires = lanes.map((d) =>
+    sweep(
+      track,
+      [
+        [d - 0.03, H],
+        [d, H + 0.03],
+        [d + 0.03, H],
+        [d, H - 0.03],
+        [d - 0.03, H],
+      ],
+      0,
+      track.length,
+      2,
+      4,
+    ),
+  );
+  if (wires.length > 0) g.add(new THREE.Mesh(mergeGeometries(wires), toon(0x222222)));
+  const iron: THREE.BufferGeometry[] = [];
+  const add = (geo: THREE.BufferGeometry, x: number, y: number, z: number, yaw = 0): void => {
+    geo.rotateY(yaw);
+    geo.translate(x, y, z);
+    iron.push(geo);
+  };
+  const spanY = H + 0.7;
+  for (let s = 12; s < track.length - 6; s += spacing) {
+    if (inRanges(s, skip, 4)) continue;
+    const [a, b] = [track.toWorld(s, -(hw + 1)), track.toWorld(s, hw + 1)];
+    for (const p of [a, b]) {
+      // Fluted base, slender shaft and ball finial.
+      add(new THREE.CylinderGeometry(0.22, 0.3, 1, 8), p.x, p.y + 0.5, p.z);
+      add(new THREE.CylinderGeometry(0.1, 0.14, spanY + 0.5, 8), p.x, p.y + (spanY + 0.5) / 2, p.z);
+      add(new THREE.SphereGeometry(0.17, 8, 6), p.x, p.y + spanY + 0.6, p.z);
+    }
+    // Span wire across the street, with a dropper and insulator down to each contact wire.
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    const yaw = Math.atan2(b.x - a.x, b.z - a.z);
+    add(new THREE.BoxGeometry(0.05, 0.05, len), (a.x + b.x) / 2, (a.y + b.y) / 2 + spanY, (a.z + b.z) / 2, yaw);
+    for (const d of lanes) {
+      const q = track.toWorld(s, d);
+      add(new THREE.BoxGeometry(0.04, 0.7, 0.04), q.x, q.y + H + 0.35, q.z);
+      add(new THREE.BoxGeometry(0.14, 0.14, 0.14), q.x, q.y + spanY, q.z, yaw);
+    }
+  }
+  if (iron.length > 0) {
+    const mesh = new THREE.Mesh(mergeGeometries(iron), toon(0x2f3b33));
+    mesh.castShadow = true;
+    g.add(mesh);
+  }
+  root.add(g);
+  return g;
 };
 
 /** Beach umbrella with a striped canopy. */

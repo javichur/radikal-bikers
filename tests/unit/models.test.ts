@@ -10,7 +10,7 @@ import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
 import { monumentModel } from '../../src/render/monuments';
 import { LOOKS, obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
-import { buildVehicle, flashBeacons } from '../../src/render/vehicleModel';
+import { buildVehicle, CONTACT_WIRE_HEIGHT, flashBeacons } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
 
 beforeAll(() => {
@@ -47,6 +47,18 @@ describe('bike model', () => {
       expect(hands).toHaveLength(2);
       for (let i = 0; i < 2; i++) expect(hands[i]!.distanceTo(grips[i]!)).toBeLessThan(0.06);
     }
+  });
+
+  it('puts the helmet visor at the front of the head, facing the road', () => {
+    const rig = buildBike(CHARACTERS[0]!);
+    rig.root.updateMatrixWorld(true);
+    const helmet = rig.rider.getObjectByName('helmet')!;
+    const visor = helmet.getObjectByName('visor')!;
+    const centre = helmet.getWorldPosition(new THREE.Vector3());
+    const box = new THREE.Box3().setFromObject(visor);
+    const mid = box.getCenter(new THREE.Vector3());
+    expect(mid.z - centre.z).toBeGreaterThan(0.15);
+    expect(Math.abs(mid.x - centre.x)).toBeLessThan(0.01);
   });
 });
 
@@ -111,8 +123,27 @@ describe('city builder', () => {
       return out;
     };
     expect(LOOKS.valencia.bus).toBe(0xd52b1e);
-    expect(colors(buildVehicle('bus', 1, false, LOOKS.valencia.bus))).toContain(0xd52b1e);
+    expect(colors(buildVehicle('bus', 1, false, 'modern', LOOKS.valencia.bus))).toContain(0xd52b1e);
     expect(colors(buildVehicle('bus', 1))).not.toContain(0xd52b1e);
+  });
+
+  it('builds a detailed vintage tram whose trolley pole reaches the contact wire', () => {
+    const g = buildVehicle('tram', 1, false, 'vintage');
+    const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    expect(size.z).toBeGreaterThan(VEHICLES.tram.length * 0.9);
+    expect(size.z).toBeLessThan(VEHICLES.tram.length * 1.1);
+    expect(size.y).toBeCloseTo(CONTACT_WIRE_HEIGHT, 0);
+    expect(g.children.length).toBeGreaterThan(buildVehicle('tram', 1).children.length);
+  });
+
+  it('strings tram wires only over old town streets with trams', () => {
+    for (const stage of STAGES) {
+      const catenary = buildCity(new World(stage, CHARACTERS[0]!)).root.getObjectByName('catenary');
+      const expected = LOOKS[stage.scenery].catenary && (stage.trafficMix?.tram ?? 0) > 0;
+      expect(catenary !== undefined).toBe(expected);
+      if (catenary) expect(catenary.children).toHaveLength(2);
+    }
+    expect(STAGES.some((s) => s.scenery === 'oldtown' && LOOKS[s.scenery].catenary)).toBe(true);
   });
 
   it('lights up traffic vehicles only at night', () => {
