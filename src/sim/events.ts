@@ -1,4 +1,7 @@
-export type TrickKind = 'nearMiss' | 'wheelie' | 'jump' | 'glass' | 'shortcut' | 'explode';
+/** Bonus boxes: explosives blow vehicles up, turbo fires the rockets. */
+export type PickupKind = 'explosive' | 'turbo';
+
+export type TrickKind = 'nearMiss' | 'wheelie' | 'jump' | 'glass' | 'shortcut' | 'explode' | 'turbo';
 
 export type SimEvent =
   | { readonly type: 'crash'; readonly cause: 'wall' | 'vehicle' | 'landing' | 'obstacle' }
@@ -12,7 +15,7 @@ export type SimEvent =
   | { readonly type: 'timeUp' }
   | { readonly type: 'honk'; readonly vehicleId: number }
   | { readonly type: 'hurryUp' }
-  | { readonly type: 'pickup'; readonly kind: 'explosive' }
+  | { readonly type: 'pickup'; readonly kind: PickupKind }
   | { readonly type: 'explode'; readonly vehicleId: number; readonly s: number; readonly d: number }
   | { readonly type: 'glass'; readonly route: number; readonly pane: number }
   | { readonly type: 'shortcut'; readonly route: number }

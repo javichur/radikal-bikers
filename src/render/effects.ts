@@ -12,7 +12,7 @@ interface Particle {
 
 const MAX_PARTICLES = 260;
 
-/** Lightweight particle bursts: explosions, flying glass, sparks, smoke, dust and bonus sparkles. */
+/** Lightweight particle bursts: explosions, flying glass, sparks, smoke, dust, rocket fire and bonus sparkles. */
 export class Effects {
   private readonly particles: Particle[] = [];
   private readonly shard = new THREE.PlaneGeometry(0.35, 0.25);
@@ -107,6 +107,19 @@ export class Effects {
   sparkle(at: THREE.Vector3): void {
     for (let i = 0; i < 20; i++) {
       this.spawn(this.cube, i % 2 ? 0xffd166 : 0xff7b00, at, Effects.rand(8, 2), 0.7, { gravity: 4, scale: 0.4 });
+    }
+  }
+
+  /** Rocket exhaust puff (turbo bonus). */
+  fire(at: THREE.Vector3, push: THREE.Vector3): void {
+    for (let i = 0; i < 2; i++) {
+      const v = push.clone().add(Effects.rand(1.5));
+      this.spawn(this.chunk, i % 2 ? 0xffd166 : 0xff7b00, at, v, 0.25 + Math.random() * 0.15, {
+        grow: 2.5,
+        gravity: -2,
+        opacity: 0.8,
+        scale: 0.18,
+      });
     }
   }
 

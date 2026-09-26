@@ -259,6 +259,30 @@ export const tntTexture = (): THREE.Texture =>
     c.fillText('BOOM!', 64, 98);
   });
 
+/** Turbo bonus crate. */
+export const turboTexture = (): THREE.Texture =>
+  canvasTexture(128, 128, (c) => {
+    c.fillStyle = '#118ab2';
+    c.fillRect(0, 0, 128, 128);
+    c.strokeStyle = '#ffd166';
+    c.lineWidth = 10;
+    c.strokeRect(5, 5, 118, 118);
+    c.fillStyle = '#ffd166';
+    c.beginPath();
+    c.moveTo(34, 22);
+    c.lineTo(64, 44);
+    c.lineTo(94, 22);
+    c.lineTo(94, 38);
+    c.lineTo(64, 60);
+    c.lineTo(34, 38);
+    c.closePath();
+    c.fill();
+    c.font = 'bold 30px "Trebuchet MS", sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('TURBO', 64, 92);
+  });
+
 export const concreteTexture = (): THREE.Texture =>
   repeat(
     canvasTexture(64, 64, (c) => {

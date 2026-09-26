@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../../src/content/characters';
 import { getStage } from '../../src/content/stages';
 import { FIXED_DT } from '../../src/core/loop';
-import { BIKE } from '../../src/sim/bike';
+import { BIKE, crashBike } from '../../src/sim/bike';
 import type { SimEvent } from '../../src/sim/events';
 import { inRiver, riverOf } from '../../src/sim/scenery';
 import { ROUTE_HALF_WIDTH, SIDEWALK } from '../../src/sim/shortcuts';
 import { profileHeight, Track } from '../../src/sim/track';
-import { EXPLODE_POINTS, World } from '../../src/sim/world';
+import { EXPLODE_POINTS, PICKUP_RESPAWN, TURBO_POINTS, World } from '../../src/sim/world';
 import { controls, run } from './helpers';
 
 const stage = getStage('harbor');
@@ -293,6 +293,88 @@ describe('explosive bonus', () => {
     w.bike.speed = 25;
     const later = run(w, 1, controls({ throttle: 1 }));
     expect(later).toContainEqual({ type: 'crash', cause: 'vehicle' });
+  });
+});
+
+describe('turbo bonus', () => {
+  const vehicle = (id: number, kind: 'bus' | 'tram' | 'car', s: number, d: number, dir: 1 | -1, speed: number) => ({
+    id,
+    kind,
+    s,
+    d,
+    dir,
+    speed,
+    cruiseSpeed: speed,
+    length: kind === 'car' ? 4.2 : 11,
+    width: kind === 'car' ? 1.9 : 2.6,
+    height: kind === 'car' ? 1.5 : 3.2,
+    honkCooldown: 99,
+    variant: 0,
+  });
+
+  it('every stage has turbo boxes on the main road', () => {
+    for (const id of ['beach', 'harbor', 'oldtown', 'industrial', 'hills', 'harborNight']) {
+      const w = new World(getStage(id), CHARACTERS[0]!);
+      expect(w.pickups.some((p) => p.kind === 'turbo' && p.route < 0)).toBe(true);
+      expect(w.pickups.some((p) => p.kind === 'explosive')).toBe(true);
+    }
+  });
+
+  it('is collected by riding over it: 5 s at 150 km/h and extra points', () => {
+    const w = newWorld();
+    const p = w.pickups.find((x) => x.kind === 'turbo')!;
+    w.bike.s = p.s - 3;
+    w.bike.d = p.d;
+    w.bike.speed = 20;
+    const events: SimEvent[] = [];
+    for (let t = 0; t < 0.5; t += FIXED_DT) events.push(...w.step(centre(w), FIXED_DT));
+    expect(events).toContainEqual({ type: 'pickup', kind: 'turbo' });
+    expect(w.bike.explosive).toBe(0);
+    expect(w.bike.turbo).toBeGreaterThan(BIKE.turboDuration - 1);
+    expect(w.bike.turbo).toBeLessThanOrEqual(BIKE.turboDuration);
+    expect(events).toContainEqual({ type: 'trick', kind: 'turbo', points: TURBO_POINTS, multiplier: 1 });
+    expect(p.respawn).toBeGreaterThan(0);
+
+    for (let t = 0; t < 2; t += FIXED_DT) w.step(centre(w), FIXED_DT);
+    expect(BIKE.turboSpeed * 3.6).toBeCloseTo(150);
+    expect(w.bike.speed).toBeGreaterThan(BIKE.turboSpeed - 1);
+    expect(w.bike.speed).toBeGreaterThan(CHARACTERS[0]!.stats.topSpeed * BIKE.wheelieBoost);
+
+    // It wears off after 5 s and the bike slows back down to its own top speed.
+    for (let t = 0; t < BIKE.turboDuration; t += FIXED_DT) w.step(centre(w), FIXED_DT);
+    expect(w.bike.turbo).toBe(0);
+    for (let t = 0; t < 3; t += FIXED_DT) w.step(centre(w), FIXED_DT);
+    expect(w.bike.speed).toBeLessThan(BIKE.turboSpeed - 3);
+    expect(w.race.bonusPoints).toBeGreaterThanOrEqual(TURBO_POINTS);
+    run(w, PICKUP_RESPAWN, controls());
+    expect(p.respawn).toBe(0);
+  });
+
+  it('jumps over every vehicle in its way, even trams', () => {
+    const w = newWorld();
+    w.bike.s = 60;
+    w.bike.d = 3;
+    w.bike.speed = BIKE.turboSpeed;
+    w.bike.turbo = BIKE.turboDuration;
+    w.traffic.vehicles.push(
+      vehicle(1, 'car', 75, 3, 1, 10),
+      vehicle(2, 'bus', 110, 3, -1, 8),
+      vehicle(3, 'tram', 150, 3, 1, 0),
+    );
+    const events = run(w, 3, controls({ throttle: 1 }));
+    expect(events.some((e) => e.type === 'crash')).toBe(false);
+    expect(events.some((e) => e.type === 'explode')).toBe(false);
+    expect(events.filter((e) => e.type === 'jump').length).toBeGreaterThanOrEqual(3);
+    expect(w.bike.crashes).toBe(0);
+    expect(w.bike.s).toBeGreaterThan(160);
+  });
+
+  it('ends when the rider crashes', () => {
+    const w = newWorld();
+    w.bike.turbo = BIKE.turboDuration;
+    crashBike(w.bike, 'landing', []);
+    expect(w.bike.crashes).toBe(1);
+    expect(w.bike.turbo).toBe(0);
   });
 });
 

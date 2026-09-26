@@ -26,6 +26,9 @@ export class Hud {
   private readonly explosive: HTMLElement;
   private readonly explosiveLabel: HTMLElement;
   private readonly explosiveTime: HTMLElement;
+  private readonly turbo: HTMLElement;
+  private readonly turboLabel: HTMLElement;
+  private readonly turboTime: HTMLElement;
   private readonly combo: HTMLElement;
   private readonly comboMult: HTMLElement;
   private readonly comboPoints: HTMLElement;
@@ -67,6 +70,15 @@ export class Hud {
       h('span', { class: 'hud-explosive-icon' }, 'TNT'),
       this.explosiveLabel,
       this.explosiveTime,
+    );
+    this.turboLabel = h('span', { class: 'hud-explosive-label' });
+    this.turboTime = h('span', { class: 'hud-explosive-time' });
+    this.turbo = h(
+      'div',
+      { class: 'hud-explosive hud-turbo', 'data-testid': 'hud-turbo' },
+      h('span', { class: 'hud-explosive-icon' }, '🚀'),
+      this.turboLabel,
+      this.turboTime,
     );
     this.comboMult = h('span', { class: 'hud-combo-mult' });
     this.comboPoints = h('span', { class: 'hud-combo-points' });
@@ -124,6 +136,7 @@ export class Hud {
       this.combo,
       this.trick,
       this.explosive,
+      this.turbo,
       this.banner,
       this.countdown,
     );
@@ -136,6 +149,7 @@ export class Hud {
     this.scoreLabel.textContent = this.i18n.t('hud.score');
     this.speedUnit.textContent = this.i18n.t('hud.speed');
     this.explosiveLabel.textContent = this.i18n.t('hud.explosive');
+    this.turboLabel.textContent = this.i18n.t('hud.turbo');
     this.comboLabel.textContent = this.i18n.t('hud.combo');
   }
 
@@ -243,6 +257,10 @@ export class Hud {
     this.explosive.classList.toggle('show', boom > 0);
     this.explosive.classList.toggle('ending', boom > 0 && boom <= 2);
     if (boom > 0) this.explosiveTime.textContent = boom.toFixed(1);
+    const turbo = world.bike.turbo;
+    this.turbo.classList.toggle('show', turbo > 0);
+    this.turbo.classList.toggle('ending', turbo > 0 && turbo <= 1.5);
+    if (turbo > 0) this.turboTime.textContent = turbo.toFixed(1);
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) this.banner.classList.remove('show');
