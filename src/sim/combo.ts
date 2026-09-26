@@ -15,6 +15,7 @@ export const TRICK_POINTS: Readonly<Record<TrickKind, number>> = {
   glass: 300,
   shortcut: 500,
   explode: 1000,
+  turbo: 1500,
 };
 
 export interface ComboState {

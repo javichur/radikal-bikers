@@ -3,6 +3,7 @@ import { Rng } from '../core/rng';
 import { DEFAULT_TRAFFIC_MIX } from '../content/vehicles';
 import { inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
 import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
+import type { PickupKind } from '../sim/events';
 import type { World } from '../sim/world';
 import {
   bridgeSpan,
@@ -24,7 +25,15 @@ import {
   umbrellaModel,
   type CrossingScene,
 } from './sceneryStyle';
-import { bannerTexture, roadTexture, shedTexture, stripeTexture, tntTexture, windowTextures } from './textures';
+import {
+  bannerTexture,
+  roadTexture,
+  shedTexture,
+  stripeTexture,
+  tntTexture,
+  turboTexture,
+  windowTextures,
+} from './textures';
 import { inRanges, ribbon, segments, sweep, wall } from './trackGeometry';
 
 const ROAD_TEX_LENGTH = 16;
@@ -33,7 +42,7 @@ export interface CityScene {
   readonly root: THREE.Group;
   /** Shop window meshes, per shortcut, in the same order as `route.panes`. */
   readonly panes: readonly (readonly THREE.Object3D[])[];
-  /** Explosive boxes, in the same order as `world.pickups`. */
+  /** Bonus boxes, in the same order as `world.pickups`. */
   readonly pickups: readonly THREE.Object3D[];
   /** Road obstacles, in the same order as `world.obstacles`. */
   readonly obstacles: readonly THREE.Object3D[];
@@ -75,19 +84,31 @@ const rampGeometry = (width: number, length: number, height: number): THREE.Buff
   return geo;
 };
 
-const pickupModel = (tex: THREE.Texture): THREE.Group => {
+const pickupModel = (tex: THREE.Texture, kind: PickupKind): THREE.Group => {
   const g = new THREE.Group();
   const crate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), toon(0xffffff, { map: tex }));
   crate.castShadow = true;
   const inner = withOutline(crate, 0.08);
   inner.name = 'crate';
-  const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 6), toon(0x222222));
-  fuse.position.y = 0.75;
-  const spark = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff8800 }));
-  spark.position.y = 0.98;
-  spark.name = 'spark';
-  inner.add(fuse, spark);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 24), toon(0xffd166, { emissive: 0xb35900 }));
+  if (kind === 'turbo') {
+    // A little rocket on top, with its flame pulsing.
+    const rocket = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 10), toon(0xe63946));
+    rocket.position.y = 0.8;
+    const flame = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff5500 }));
+    flame.position.y = 0.55;
+    flame.name = 'spark';
+    inner.add(rocket, flame);
+  } else {
+    const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 6), toon(0x222222));
+    fuse.position.y = 0.75;
+    const spark = new THREE.Mesh(new THREE.IcosahedronGeometry(0.12, 0), toon(0xffd166, { emissive: 0xff8800 }));
+    spark.position.y = 0.98;
+    spark.name = 'spark';
+    inner.add(fuse, spark);
+  }
+  const ringColor = kind === 'turbo' ? 0x4cc9f0 : 0xffd166;
+  const ringGlow = kind === 'turbo' ? 0x0077b6 : 0xb35900;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.07, 6, 24), toon(ringColor, { emissive: ringGlow }));
   ring.rotation.x = Math.PI / 2;
   ring.position.y = -0.75;
   g.add(inner, ring);
@@ -422,10 +443,11 @@ export const buildCity = (world: World): CityScene => {
     root.add(ramp);
   }
 
-  // Explosive bonus boxes.
+  // Bonus boxes (explosives and turbo).
   const tnt = tntTexture();
+  const turbo = turboTexture();
   const pickups = world.pickups.map((pk) => {
-    const g = pickupModel(tnt);
+    const g = pickupModel(pk.kind === 'turbo' ? turbo : tnt, pk.kind);
     const p = world.trackOf(pk.route).toWorld(pk.s, pk.d);
     g.position.set(p.x, p.y + 0.95, p.z);
     root.add(g);

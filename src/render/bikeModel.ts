@@ -548,3 +548,66 @@ export const buildBike = (c: CharacterDef): BikeRig => {
 };
 
 export const BIKE_WHEEL_RADIUS = WHEEL_R;
+
+export interface TurboRockets {
+  readonly root: THREE.Group;
+  /** Exhaust flames (one per rocket), flickered by the renderer. */
+  readonly flames: readonly THREE.Object3D[];
+}
+
+/** Two rockets strapped to the sides of the bike, with fire coming out of their nozzles (turbo bonus). */
+export const buildTurboRockets = (): TurboRockets => {
+  const root = new THREE.Group();
+  root.name = 'turboRockets';
+  const flames: THREE.Object3D[] = [];
+  const bodyGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.8, 12);
+  const noseGeo = new THREE.ConeGeometry(0.11, 0.26, 12);
+  const finGeo = new THREE.BoxGeometry(0.02, 0.18, 0.2);
+  const nozzleGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.1, 12);
+  const outerFlameGeo = new THREE.ConeGeometry(0.12, 0.9, 10);
+  // Flames grow from the nozzle backwards.
+  outerFlameGeo.translate(0, -0.45, 0);
+  const innerFlameGeo = new THREE.ConeGeometry(0.06, 0.55, 8);
+  innerFlameGeo.translate(0, -0.275, 0);
+  const outerFire = new THREE.MeshBasicMaterial({
+    color: 0xff7b00,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+  });
+  const innerFire = new THREE.MeshBasicMaterial({
+    color: 0xfff3b0,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+  });
+  for (const side of [-1, 1]) {
+    // Built along +y, then laid down pointing forward (+z).
+    const rocket = new THREE.Group();
+    rocket.rotation.x = Math.PI / 2;
+    rocket.position.set(side * 0.4, 0.62, -0.15);
+    const body = withOutline(mesh(bodyGeo, 0xf8f9fa), 0.05);
+    const band = place(mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.12, 12), 0xe63946), 0, 0.15, 0);
+    const nose = place(mesh(noseGeo, 0xe63946), 0, 0.53, 0);
+    const nozzle = place(mesh(nozzleGeo, DARK), 0, -0.45, 0);
+    rocket.add(body, band, nose, nozzle);
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI * 2;
+      const fin = place(mesh(finGeo, 0xe63946), Math.cos(a) * 0.14, -0.3, Math.sin(a) * 0.14);
+      fin.rotation.y = -a;
+      rocket.add(fin);
+    }
+    const flame = new THREE.Group();
+    flame.name = 'flame';
+    flame.position.y = -0.5;
+    flame.add(new THREE.Mesh(outerFlameGeo, outerFire), new THREE.Mesh(innerFlameGeo, innerFire));
+    rocket.add(flame);
+    flames.push(flame);
+    // Strut holding the rocket on the frame.
+    const strut = place(mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), CHROME), -side * 0.18, 0, 0);
+    rocket.add(strut);
+    root.add(rocket);
+  }
+  root.visible = false;
+  return { root, flames };
+};
