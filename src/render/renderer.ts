@@ -12,7 +12,7 @@ import { buildCity, type CityScene } from './cityBuilder';
 import { poseObstacle } from './sceneryStyle';
 import { Effects } from './effects';
 import { toon } from './materials';
-import { buildVehicle } from './vehicleModel';
+import { buildVehicle, flashBeacons } from './vehicleModel';
 
 export type CameraMode = 'chase' | 'showcase' | 'orbit';
 export type RenderQuality = 'high' | 'low';
@@ -364,6 +364,7 @@ export class GameRenderer {
       g.rotation.order = 'YXZ';
       g.rotation.y = v.dir === 1 ? p.heading : p.heading + Math.PI;
       g.rotation.x = -Math.atan(world.track.sample(v.s).slope * v.dir);
+      flashBeacons(g, this.time, v.id * 0.37);
     }
     for (const [id, g] of this.vehicles) {
       if (!alive.has(id)) {
