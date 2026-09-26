@@ -76,6 +76,9 @@ export const en: Record<MessageKey, string> = {
   'char.nitro.bio': 'The fastest rider in town… if he can keep the bike straight.',
   'stage.harborNight.name': 'Radikal Harbour · Night',
   'stage.harborNight.desc': 'The same streets at night: more traffic, more roadworks and Nitro waiting at the start.',
+  'stage.valencia.name': 'Valencia',
+  'stage.valencia.desc':
+    'Right in the middle of Fallas: from the City of Arts and Sciences along the Turia, over the Serrans bridge and through its towers, across the old town to Colón and the Porta de la Mar.',
   'stage.shortcutsFound': 'Shortcuts found',
   'stage.locked': 'Get {n} ★ to unlock',
   'stage.challenges': 'Challenges',

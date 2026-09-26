@@ -39,7 +39,12 @@ src/
 - **Contenido como datos.** Añadir un recorrido o un personaje consiste en añadir una entrada a `content/` y sus textos
   en `ui/locales/` (`stage.<id>.name` y `stage.<id>.desc`). `STAGES` se muestra en orden de dificultad y cada
   `StageDef` elige un estilo de decorado (`scenery`), la mezcla de tráfico y, opcionalmente, obstáculos, pasos a
-  nivel, mar, túneles y puentes. `tests/unit/stages.test.ts` valida el trazado de cada recorrido.
+  nivel, mar, túneles y puentes. Cada puente puede ajustar el tamaño de su río (`river`, con `dry` para un cauce seco
+  de césped). También hay parques (`parks`, polígonos sin edificios que la avenida solo cruza por puentes) y
+  monumentos (`monuments`, tipos de `content/monuments.ts` dibujados en `render/monuments.ts`, que apartan los
+  edificios procedurales). El estilo `valencia` añade manzanas continuas del Ensanche, tejados de teja azul vidriada y
+  naranjos. `tests/unit/stages.test.ts` valida el trazado de cada recorrido, que los parques solo se crucen por puentes
+  y que los monumentos no pisen calzadas ni atajos.
 
 ## Física (resumen)
 

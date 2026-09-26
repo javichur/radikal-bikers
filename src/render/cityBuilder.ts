@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { Rng } from '../core/rng';
+import { MONUMENTS } from '../content/monuments';
 import { DEFAULT_TRAFFIC_MIX } from '../content/vehicles';
-import { inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
+import { inPolygon, inRiver, polygonDistance, railOf, riverOf } from '../sim/scenery';
 import { FACADE_GAP, SIDEWALK } from '../sim/shortcuts';
 import type { PickupKind } from '../sim/events';
 import type { World } from '../sim/world';
@@ -11,13 +12,16 @@ import {
   buildRiver,
   buildShortcut,
   buildTunnel,
+  PARK_GREEN,
   type BuildingRow,
   type Obstacle,
 } from './landmarks';
 import { toon, withOutline } from './materials';
+import { monumentModel } from './monuments';
 import { coneGeometry, glowInstances, LAMP_LIGHT, poolGeometry, poolMatrix } from './nightLights';
 import {
   buildCrossing,
+  buildPark,
   buildSea,
   LOOKS,
   obstacleModel,
@@ -202,9 +206,20 @@ export const buildCity = (world: World): CityScene => {
   const crossings = world.crossings.map((c) => buildCrossing(track, c.s, hw, root));
   if (stage.sea) buildSea(stage.sea, root);
   const sea = stage.sea;
+  const parks = stage.parks ?? [];
+  parks.forEach((poly) => buildPark(poly, PARK_GREEN, root));
   for (let s = 0; s <= L; s += 6) {
     const p = track.toWorld(s, 0);
     obstacles.push({ x: p.x, z: p.z, r: hw + SIDEWALK + 0.3 });
+  }
+  // Monuments, facing the road, with the buildings kept out of their footprint.
+  for (const mon of stage.monuments ?? []) {
+    const p = track.toWorld(mon.at * L, mon.d);
+    const g = monumentModel(mon.kind);
+    g.position.set(p.x, p.y + (mon.d === 0 ? 0 : -0.05), p.z);
+    g.rotation.y = p.heading + Math.sign(mon.d) * (Math.PI / 2);
+    root.add(g);
+    obstacles.push({ x: p.x, z: p.z, r: MONUMENTS[mon.kind].radius });
   }
 
   // Buildings (instanced), only where the whole footprint is clear of roads, shops, tunnels and water.
@@ -263,12 +278,17 @@ export const buildCity = (world: World): CityScene => {
     return (
       rivers.every((r) => !inRiver(r, x, z, reach + 3)) &&
       (!sea || polygonDistance(sea, x, z) > reach + 25) &&
+      parks.every((poly) => polygonDistance(poly, x, z) > reach + 2) &&
       obstacles.every((o) => {
         if (Math.abs(o.x - x) > o.r + reach || Math.abs(o.z - z) > o.r + reach) return true;
         return pts.every(([px, pz]) => Math.hypot(px - o.x, pz - o.z) > o.r);
       })
     );
   };
+
+  /** Whether a small prop fits at a point (off roads, water and landmarks; parks allowed). */
+  const pointFree = (x: number, z: number, r: number): boolean =>
+    rivers.every((rv) => !inRiver(rv, x, z, r)) && obstacles.every((o) => Math.hypot(o.x - x, o.z - z) > o.r + r);
 
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -335,14 +355,17 @@ export const buildCity = (world: World): CityScene => {
   containers.count = containerCount;
   if (containerCount > 0) root.add(containers);
 
-  const [trunkGeo, crownGeo, crownColor] = treeGeometries(look.tree);
+  const [trunkGeo, crownGeo, crownColor, fruitGeo] = treeGeometries(look.tree);
   const trunks = new THREE.InstancedMesh(trunkGeo, toon(0x8d5524), propsTrees.length);
   const crowns = new THREE.InstancedMesh(crownGeo, toon(crownColor), propsTrees.length);
   crowns.castShadow = true;
+  const fruit = fruitGeo && new THREE.InstancedMesh(fruitGeo, toon(0xff8c1a), propsTrees.length);
   propsTrees.forEach((mt, i) => {
     trunks.setMatrixAt(i, mt);
     crowns.setMatrixAt(i, mt);
+    fruit?.setMatrixAt(i, mt);
   });
+  if (fruit) root.add(fruit);
   const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 5, 6);
   poleGeo.translate(0, 2.5, 0);
   const bulbGeo = new THREE.SphereGeometry(0.3, 8, 6);
@@ -380,6 +403,33 @@ export const buildCity = (world: World): CityScene => {
         root.add(u);
       }
     }
+  }
+
+  // Palm trees scattered over the park lawns (clear of paths, water and monuments).
+  if (parks.length > 0) {
+    const [trunkGeo, crownGeo, crownColor] = treeGeometries('palm');
+    const palms: THREE.Matrix4[] = [];
+    for (const poly of parks) {
+      const xs = poly.map((p) => p[0]);
+      const zs = poly.map((p) => p[1]);
+      const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+      const tries = Math.min(4000, Math.ceil(((x1 - x0) * (z1 - z0)) / 150));
+      for (let i = 0; i < tries && palms.length < 700; i++) {
+        const x = rng.range(x0, x1);
+        const z = rng.range(z0, z1);
+        if (!inPolygon(poly, x, z) || !pointFree(x, z, 2)) continue;
+        const scale = new THREE.Vector3(1, rng.range(0.9, 1.5), 1);
+        palms.push(new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), scale));
+      }
+    }
+    const trunks = new THREE.InstancedMesh(trunkGeo, toon(0x8d5524), palms.length);
+    const crowns = new THREE.InstancedMesh(crownGeo, toon(crownColor), palms.length);
+    crowns.castShadow = true;
+    palms.forEach((mt, i) => {
+      trunks.setMatrixAt(i, mt);
+      crowns.setMatrixAt(i, mt);
+    });
+    root.add(trunks, crowns);
   }
 
   // Tower cranes over the industrial estate.

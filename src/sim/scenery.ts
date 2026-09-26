@@ -10,14 +10,30 @@ export interface River {
   readonly halfWidth: number;
   /** Half length measured across the road. */
   readonly halfLength: number;
+  /** Dry riverbed (a grassy park) instead of water. */
+  readonly dry?: boolean;
 }
 
 export const RIVER_HALF_WIDTH = 45;
 export const RIVER_HALF_LENGTH = 320;
 
-export const riverOf = (track: Track, bridge: { readonly from: number; readonly to: number }): River => {
+export const riverOf = (
+  track: Track,
+  bridge: {
+    readonly from: number;
+    readonly to: number;
+    readonly river?: { readonly halfWidth: number; readonly halfLength: number; readonly dry?: boolean };
+  },
+): River => {
   const p = track.sample(((bridge.from + bridge.to) / 2) * track.length);
-  return { x: p.x, z: p.z, heading: p.heading, halfWidth: RIVER_HALF_WIDTH, halfLength: RIVER_HALF_LENGTH };
+  return {
+    x: p.x,
+    z: p.z,
+    heading: p.heading,
+    halfWidth: bridge.river?.halfWidth ?? RIVER_HALF_WIDTH,
+    halfLength: bridge.river?.halfLength ?? RIVER_HALF_LENGTH,
+    dry: bridge.river?.dry ?? false,
+  };
 };
 
 /** Whether a world XZ point is on the river (grown by `margin`). */

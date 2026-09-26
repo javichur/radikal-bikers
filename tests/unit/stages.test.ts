@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../../src/content/characters';
+import { MONUMENTS } from '../../src/content/monuments';
 import { OBSTACLES } from '../../src/content/obstacles';
 import { roundCorners, STAGES } from '../../src/content/stages';
 import { DEFAULT_TRAFFIC_MIX, VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { BIKE } from '../../src/sim/bike';
 import { BARRIER_OFFSET } from '../../src/sim/crossing';
-import { inRiver, polygonDistance, railOf, riverOf, type River } from '../../src/sim/scenery';
+import { inPolygon, inRiver, polygonDistance, railOf, riverOf, type River } from '../../src/sim/scenery';
 import { ROUTE_HALF_WIDTH, SIDEWALK } from '../../src/sim/shortcuts';
 import { Track } from '../../src/sim/track';
 import { World } from '../../src/sim/world';
@@ -16,7 +17,9 @@ describe('stage list', () => {
     expect([...levels].sort((a, b) => a - b)).toEqual(levels);
     expect(levels[0]).toBe(1);
     expect(new Set(STAGES.map((s) => s.id)).size).toBe(STAGES.length);
-    expect(new Set(STAGES.map((s) => s.scenery))).toEqual(new Set(['beach', 'city', 'oldtown', 'industrial', 'hills']));
+    expect(new Set(STAGES.map((s) => s.scenery))).toEqual(
+      new Set(['beach', 'city', 'oldtown', 'industrial', 'hills', 'valencia']),
+    );
     for (const l of levels) expect(l).toBeGreaterThanOrEqual(1);
     for (const l of levels) expect(l).toBeLessThanOrEqual(5);
   });
@@ -191,6 +194,41 @@ describe.each(STAGES.map((s) => [s.id, s] as const))('stage %s', (_id, stage) =>
       }
     },
   );
+
+  it('only enters a park on a bridge', () => {
+    for (const park of stage.parks ?? []) {
+      for (let s = 0; s < L; s += 2) {
+        for (const d of [-edge, 0, edge]) {
+          const p = w.track.toWorld(s, d);
+          if (inPolygon(park, p.x, p.z)) {
+            expect(stage.bridges.some((b) => s > b.from * L && s < b.to * L)).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps monuments off the roads (city gates stand over a covered section)', () => {
+    for (const m of stage.monuments ?? []) {
+      const def = MONUMENTS[m.kind];
+      if (def.spansRoad) {
+        expect(m.d).toBe(0);
+        expect(stage.tunnels.some((t) => m.at > t.from && m.at < t.to)).toBe(true);
+        continue;
+      }
+      const c = w.track.toWorld(m.at * L, m.d);
+      for (let s = 0; s < L; s += 2) {
+        const p = w.track.sample(s);
+        expect(Math.hypot(p.x - c.x, p.z - c.z)).toBeGreaterThan(def.radius + edge);
+      }
+      for (const r of w.routes) {
+        for (let s = 0; s < r.track.length; s += 2) {
+          const p = r.track.sample(s);
+          expect(Math.hypot(p.x - c.x, p.z - c.z)).toBeGreaterThan(def.radius + ROUTE_HALF_WIDTH + 2);
+        }
+      }
+    }
+  });
 
   it('keeps the roads out of the sea, with a beach in between', () => {
     if (!stage.sea) return;
