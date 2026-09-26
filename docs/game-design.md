@@ -40,11 +40,12 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 ## Retos, notas y progresión
 
 - 3 retos por recorrido (una ⭐ cada uno, solo si entregas la pizza). Puerto Radikal: caballito de 2,5 s, 2 atajos,
-  sin caerse. Puerto Radikal de noche: 12 «a un pelo», combo de 6, ganar al rival.
+  sin caerse. Puerto Radikal de noche: 12 «a un pelo», combo de 6, ganar al rival. València: 4 atajos, 3 explosiones,
+  ganar al rival.
 - Nota por puntuación (umbrales en `content/stages.ts`, calibrados con el piloto automático de los tests).
 - **XP** = puntuación de cada partida; niveles con coste creciente (máx. 10) y 5 rangos. Las pinturas se desbloquean en
   los niveles 2, 3, 4, 5 y 7.
-- Desbloqueos por estrellas totales: recorrido nocturno (2 ⭐), Nitro (4 ⭐).
+- Desbloqueos por estrellas totales: recorrido nocturno (2 ⭐), Nitro (4 ⭐), València (8 ⭐).
 - Estadísticas de carrera en el título: partidas, entregas, km recorridos, «a un pelo», explosiones y mejor combo.
 - Los atajos descubiertos se marcan en la tarjeta del recorrido.
 
@@ -66,7 +67,8 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 ## Recorridos
 
 Como en otros arcades de Gaelco, los recorridos se eligen por dificultad (★ a ★★★★★) y los más difíciles son más
-largos. Todos transcurren de día en una ciudad costera de estilo italiano y sus alrededores.
+largos. Casi todos transcurren de día en una ciudad costera de estilo italiano y sus alrededores; el último recorre
+calles reales de València.
 
 | Recorrido              | Dificultad | Longitud | Calzada                   | Tiempo inicial / checkpoints | Rasgos propios                                                                                              |
 | ---------------------- | ---------- | -------- | ------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -96,6 +98,28 @@ atropellar un cono frena la moto) y usa una semilla de tráfico distinta (fija c
 
 **Puerto Radikal de noche**: mismas calles con iluminación nocturna y faro, más tráfico, 3 obras, rival Nitro y retos
 más duros.
+
+**València** (★★★★★, ~3,9 km, 4 carriles, 45 s / +42, +32, +32, +38 s; se desbloquea con 8 ⭐): reparto en plenas
+Fallas sobre un trazado sacado de coordenadas reales (lat/lon proyectadas a metros con una escala uniforme de 0,53, así
+se conservan ángulos y proporciones). Las esquinas se han situado de memoria (sin contrastar con OpenStreetMap), con un
+margen de unos 100 m reales:
+
+1. Av. del Professor López Piñero junto a L'Umbracle, L'Hemisfèric y el Museu de les Ciències.
+2. Pont de l'Assut de l'Or (puente elevado con su pilón blanco inclinado) sobre los estanques de la Ciutat de les Arts.
+3. Margen norte del Jardí del Túria (0,15–0,65 del recorrido): Palau de les Arts, Passeig de
+   l'Albereda, Palau de la Música, La Peineta, Pont del Real y Museu de Belles Arts.
+4. Pont de Serrans (sobre el cauce seco) y paso bajo las Torres de Serrans (licencia: en realidad el arco es peatonal).
+5. Carrer de Serrans, Plaça de la Mare de Déu (Font del Túria), Plaça de la Reina (Micalet) y Sant Vicent Màrtir.
+6. Plaça de l'Ajuntament con una **falla** en el centro (sólida e indestructible; el tráfico pasa por ambos lados),
+   el Ajuntament y Correos.
+7. Carrer de Xàtiva (Estació del Nord y Plaça de Bous) y Carrer de Colón hasta la Porta de la Mar.
+
+Tiene 8 atajos: pasarela de L'Umbracle, dos caminos de tierra por el Jardí del Túria, callejones de Penya-roja, Barri
+del Carme hasta la Plaça Redonda (tiendas), carrerons de Sant Francesc, Carrer de Ribera (tiendas) y Poeta Querol
+(tiendas). Los escaparates llevan rótulos locales (MERCAT, ORXATA, FARTONS, FALLES, CERÀMICA). Además: 6 rampas, 5 cajas
+de explosivos en la avenida y 3 en atajos, **terrasses** de bar que se derriban como los conos, conos, 3 obras al azar,
+autobuses, taxis, furgonetas, camiones, tranvía y rival Nitro. Como las curvas del Túria son casi todas a la izquierda,
+la mayoría de los atajos salen por ese lado, y en las rectas del cauce no caben atajos más cortos que la avenida.
 
 ## HUD
 

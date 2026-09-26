@@ -120,7 +120,7 @@ const models: Record<MonumentKind, (g: THREE.Group) => void> = {
     const top = new THREE.Vector3(Math.sin(0.18) * 62, Math.cos(0.18) * 62 - 2, 0);
     for (let i = 0; i < 7; i++) {
       const a = top.clone().multiplyScalar(0.55 + i * 0.07);
-      g.add(rod(a, new THREE.Vector3(-18 - i * 12, 7, 21), 0.12, 0xdddddd));
+      g.add(rod(a, new THREE.Vector3(-18 - i * 12, 8, 7), 0.12, 0xdddddd));
     }
   },
   palauMusica: (g) => {
