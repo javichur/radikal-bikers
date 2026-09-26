@@ -63,6 +63,37 @@ describe('UpdateChecker', () => {
     await second.checker.check();
     expect(second.reload).not.toHaveBeenCalled();
   });
+
+  it('replaces a pending version when a newer deploy is detected before reloading', async () => {
+    let remote: string | null = 'v2';
+    const storage = memory();
+    const state: { screen: Screen } = { screen: 'racing' };
+    const reload = vi.fn();
+    const checker = new UpdateChecker({
+      current: 'v1',
+      fetchVersion: () => Promise.resolve(remote),
+      getScreen: () => state.screen,
+      reload,
+      storage,
+    });
+    await checker.check();
+    expect(checker.updatePending).toBe(true);
+    remote = 'v3';
+    await checker.check();
+    state.screen = 'title';
+    checker.onScreen(state.screen);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    const next = new UpdateChecker({
+      current: 'v1',
+      fetchVersion: () => Promise.resolve('v3'),
+      getScreen: () => 'title',
+      reload: vi.fn(),
+      storage,
+    });
+    await next.check();
+    expect(next.updatePending).toBe(false);
+  });
 });
 
 describe('fetchDeployedVersion', () => {

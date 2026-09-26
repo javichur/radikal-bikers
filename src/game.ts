@@ -44,6 +44,7 @@ export class Game {
   private readonly screenRoot: HTMLElement;
   private readonly stepper = new FixedStepper();
   private readonly isTouch = isTouchDevice();
+  private readonly listeners = new AbortController();
   private world: World;
   private result: ResultInfo | null = null;
   private lastFrame = 0;
@@ -54,6 +55,8 @@ export class Game {
   /** Fixed traffic seed for reproducible end-to-end tests; random traffic and roadworks otherwise. */
   private readonly fixedSeed: boolean;
   private updates: UpdateChecker | null = null;
+  private frameId = 0;
+  private disposed = false;
 
   constructor(private readonly root: HTMLElement) {
     this.i18n = new I18n(this.save.settings.locale ?? detectLocale(navigator.languages ?? [navigator.language]));
@@ -77,12 +80,15 @@ export class Game {
     this.keyboard = new KeyboardInput(window, (a) => this.onMenu(a));
     this.gamepad = new GamepadInput((a) => this.onMenu(a));
 
-    window.addEventListener('resize', () => this.renderer.resize());
-    window.addEventListener('pointerdown', () => this.audio.unlock(), { passive: true });
+    window.addEventListener('resize', () => this.renderer.resize(), { signal: this.listeners.signal });
+    window.addEventListener('pointerdown', () => this.audio.unlock(), {
+      passive: true,
+      signal: this.listeners.signal,
+    });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.flow.screen === 'racing') this.onMenu('pause');
       if (!document.hidden) void this.updates?.check();
-    });
+    }, { signal: this.listeners.signal });
 
     if (!import.meta.env.DEV && !params.has('e2e')) {
       this.updates = new UpdateChecker({
@@ -94,7 +100,7 @@ export class Game {
       });
       window.addEventListener('pageshow', (e) => {
         if (e.persisted) void this.updates?.check();
-      });
+      }, { signal: this.listeners.signal });
       void this.updates.check();
     }
 
@@ -111,13 +117,27 @@ export class Game {
   }
 
   start(): void {
+    if (this.disposed) return;
     const frame = (t: number): void => {
+      if (this.disposed) return;
       const dt = this.lastFrame ? Math.min((t - this.lastFrame) / 1000, 0.1) : 0;
       this.lastFrame = t;
       this.tick(dt);
-      requestAnimationFrame(frame);
+      this.frameId = requestAnimationFrame(frame);
     };
-    requestAnimationFrame(frame);
+    this.frameId = requestAnimationFrame(frame);
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.frameId) cancelAnimationFrame(this.frameId);
+    this.listeners.abort();
+    this.keyboard.dispose();
+    this.gamepad.dispose();
+    this.touch.dispose();
+    this.audio.stopEngine();
+    this.audio.stopMusic();
   }
 
   private previewWorld(): World {

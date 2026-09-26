@@ -31,14 +31,13 @@ export class UpdateChecker {
   }
 
   async check(): Promise<void> {
-    if (this.pending || this.checking) return;
+    if (this.checking) return;
     this.checking = true;
     try {
       const remote = await this.opts.fetchVersion();
-      if (remote && remote !== this.opts.current && this.readReloaded() !== remote) {
-        this.pending = remote;
-        this.onScreen(this.opts.getScreen());
-      }
+      if (!remote || remote === this.opts.current || this.readReloaded() === remote) return;
+      this.pending = remote;
+      this.onScreen(this.opts.getScreen());
     } catch {
       // Network errors are ignored; we'll retry on the next resume.
     } finally {
