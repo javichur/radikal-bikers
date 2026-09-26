@@ -7,7 +7,7 @@ import { buildBike, solveTwoBone } from '../../src/render/bikeModel';
 import { VEHICLE_KINDS, VEHICLES } from '../../src/content/vehicles';
 import { buildCity } from '../../src/render/cityBuilder';
 import { obstacleModel, poseObstacle } from '../../src/render/sceneryStyle';
-import { buildVehicle } from '../../src/render/vehicleModel';
+import { buildVehicle, flashBeacons } from '../../src/render/vehicleModel';
 import { World } from '../../src/sim/world';
 
 beforeAll(() => {
@@ -83,6 +83,22 @@ describe('city builder', () => {
       const size = box.getSize(new THREE.Vector3());
       expect(size.z).toBeGreaterThan(VEHICLES[kind].length * 0.9);
       expect(size.z).toBeLessThan(VEHICLES[kind].length * 1.1);
+    }
+  });
+
+  it('gives emergency and service vehicles flashing beacons', () => {
+    for (const kind of VEHICLE_KINDS) {
+      const g = buildVehicle(kind, 0);
+      const bars = g.userData.beacons as THREE.Object3D[][] | undefined;
+      const expected = kind === 'police' || kind === 'ambulance' || kind === 'fireTruck' || kind === 'garbageTruck';
+      expect(bars !== undefined).toBe(expected);
+      if (!bars) continue;
+      flashBeacons(g, 0, 0);
+      const [a, b] = bars[0]!;
+      expect(a!.visible).not.toBe(b!.visible);
+      const before = a!.visible;
+      flashBeacons(g, 1 / 6, 0);
+      expect(a!.visible).toBe(!before);
     }
   });
 });
