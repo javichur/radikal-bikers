@@ -1,4 +1,5 @@
 import type { ChallengeDef, GradeThresholds } from './challenges';
+import type { PickupKind } from '../sim/events';
 import type { ObstacleKind } from './obstacles';
 import type { TrafficMix } from './vehicles';
 
@@ -48,8 +49,16 @@ export interface StageDef {
   readonly tunnels: readonly { readonly from: number; readonly to: number }[];
   /** Raised sections over a river, as course fractions (the profile must lift the road there). */
   readonly bridges: readonly { readonly from: number; readonly to: number }[];
-  /** Explosive bonus boxes. `route` is -1 for the main road or a shortcut index; `at` is a fraction of it. */
-  readonly pickups: readonly { readonly route: number; readonly at: number; readonly d: number }[];
+  /**
+   * Bonus boxes. `route` is -1 for the main road or a shortcut index; `at` is a fraction of it.
+   * `kind` defaults to the explosive bonus.
+   */
+  readonly pickups: readonly {
+    readonly route: number;
+    readonly at: number;
+    readonly d: number;
+    readonly kind?: PickupKind;
+  }[];
   /** Fixed obstacles on the main road (`at` = course fraction, `d` = lateral offset of their centre). */
   readonly obstacles?: readonly { readonly at: number; readonly d: number; readonly kind: ObstacleKind }[];
   /** Level crossings: railway across the road at `at`, a train every `period` s (timetable shifted by `offset`). */
@@ -194,6 +203,8 @@ export const STAGES: readonly StageDef[] = [
       { route: -1, at: 0.6, d: -3 },
       { route: -1, at: 0.88, d: 3 },
       { route: 1, at: 0.5, d: 0 },
+      { route: -1, at: 0.37, d: 3, kind: 'turbo' },
+      { route: -1, at: 0.72, d: 9, kind: 'turbo' },
     ],
     sea: [
       [62, -3000],
@@ -297,6 +308,8 @@ export const STAGES: readonly StageDef[] = [
       { route: -1, at: 0.9, d: -3 },
       { route: 0, at: 0.5, d: 0 },
       { route: 2, at: 0.5, d: 0 },
+      { route: -1, at: 0.27, d: 3, kind: 'turbo' },
+      { route: -1, at: 0.74, d: 9, kind: 'turbo' },
     ],
     trafficDensity: 16,
     roadworks: [
@@ -388,6 +401,8 @@ export const STAGES: readonly StageDef[] = [
       { route: -1, at: 0.19, d: -3.5 },
       { route: -1, at: 0.68, d: 3.5 },
       { route: 2, at: 0.5, d: 0 },
+      { route: -1, at: 0.25, d: 3.5, kind: 'turbo' },
+      { route: -1, at: 0.78, d: 3.5, kind: 'turbo' },
     ],
     obstacles: [
       { at: 0.06, d: 0, kind: 'fountain' },
@@ -469,6 +484,8 @@ export const STAGES: readonly StageDef[] = [
       { route: -1, at: 0.95, d: 6 },
       { route: 0, at: 0.5, d: 0 },
       { route: 2, at: 0.5, d: 0 },
+      { route: -1, at: 0.5, d: 3, kind: 'turbo' },
+      { route: -1, at: 0.85, d: 9, kind: 'turbo' },
     ],
     obstacles: [
       { at: 0.3, d: 6, kind: 'cones' },
@@ -587,6 +604,8 @@ export const STAGES: readonly StageDef[] = [
       { route: -1, at: 0.2, d: -4 },
       { route: -1, at: 0.58, d: 4 },
       { route: 0, at: 0.5, d: 0 },
+      { route: -1, at: 0.4, d: 4, kind: 'turbo' },
+      { route: -1, at: 0.7, d: 4, kind: 'turbo' },
     ],
     trafficDensity: 8,
     trafficMix: { car: 5, van: 2, truck: 2, bus: 1 },
@@ -686,6 +705,8 @@ export const STAGES: readonly StageDef[] = [
       { route: -1, at: 0.9, d: -3 },
       { route: 0, at: 0.5, d: 0 },
       { route: 2, at: 0.5, d: 0 },
+      { route: -1, at: 0.33, d: 9, kind: 'turbo' },
+      { route: -1, at: 0.76, d: 3, kind: 'turbo' },
     ],
     trafficDensity: 19,
     roadworks: [

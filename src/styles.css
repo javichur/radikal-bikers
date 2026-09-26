@@ -953,6 +953,15 @@ body {
   color: var(--yellow);
 }
 
+.hud-turbo {
+  top: 25%;
+  background: #118ab2;
+}
+
+.hud-turbo .hud-explosive-icon {
+  background: var(--yellow);
+}
+
 @keyframes hud-blink {
   50% {
     opacity: 0.3;

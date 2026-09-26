@@ -5,7 +5,7 @@ import { BIKE } from '../sim/bike';
 import { ghostPose, type GhostData } from '../sim/ghost';
 import type { Track } from '../sim/track';
 import type { World } from '../sim/world';
-import { buildBike, BIKE_WHEEL_RADIUS, type BikeRig } from './bikeModel';
+import { buildBike, buildTurboRockets, BIKE_WHEEL_RADIUS, type BikeRig, type TurboRockets } from './bikeModel';
 import type { SimEvent } from '../sim/events';
 import { TRAIN_LENGTH } from '../sim/crossing';
 import { buildCity, type CityScene } from './cityBuilder';
@@ -62,6 +62,8 @@ export class GameRenderer {
   private city: CityScene | null = null;
   private readonly effects: Effects;
   private aura: THREE.Mesh | null = null;
+  private rockets: TurboRockets | null = null;
+  private fireCooldown = 0;
   private bike: BikeRig | null = null;
   private rival: BikeRig | null = null;
   private ghostRig: BikeRig | null = null;
@@ -156,6 +158,9 @@ export class GameRenderer {
     this.aura.position.y = 0.9;
     this.aura.visible = false;
     this.bike.root.add(this.aura);
+    // Rockets strapped to the sides while the turbo bonus is active.
+    this.rockets = buildTurboRockets();
+    this.bike.lean.add(this.rockets.root);
     this.scene.add(this.bike.root);
   }
 
@@ -340,6 +345,23 @@ export class GameRenderer {
       this.aura.visible = b.explosive > 0 && (b.explosive > 2 || Math.floor(this.time * 8) % 2 === 0);
       this.aura.rotation.y += dt * 3;
       this.aura.scale.setScalar(1 + Math.sin(this.time * 10) * 0.06);
+    }
+    if (this.rockets) {
+      const on = b.turbo > 0 && b.crashTimer <= 0;
+      this.rockets.root.visible = on;
+      this.fireCooldown = Math.max(0, this.fireCooldown - dt);
+      if (on) {
+        const fade = Math.min(1, b.turbo / 0.5);
+        this.rockets.flames.forEach((f, i) => {
+          f.scale.set(1, (0.8 + Math.random() * 0.6) * fade, 1);
+          if (this.fireCooldown <= 0) {
+            const at = f.getWorldPosition(new THREE.Vector3());
+            const h = p.heading - b.yaw;
+            this.effects.fire(at, new THREE.Vector3(-Math.sin(h), 0.3, -Math.cos(h)).multiplyScalar(4 + i));
+          }
+        });
+        if (this.fireCooldown <= 0) this.fireCooldown = 0.05;
+      }
     }
     // Blink while invulnerable after respawn.
     rig.root.visible = b.invulnerable <= 0 || Math.floor(this.time * 12) % 2 === 0;

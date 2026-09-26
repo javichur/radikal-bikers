@@ -34,6 +34,7 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 | Cristal roto                               | 300         |
 | Atajo completado                           | 500         |
 | Vehículo explotado (bonus explosivo)       | 1000        |
+| Caja de turbo recogida                     | 1500        |
 
 «A un pelo» y el salto aplican un breve efecto de cámara lenta.
 

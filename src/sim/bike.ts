@@ -33,6 +33,12 @@ export const BIKE = {
   slopeFactor: 0.45,
   /** Seconds the explosive bonus lasts. */
   explosiveDuration: 8,
+  /** Seconds the turbo bonus lasts. */
+  turboDuration: 5,
+  /** Turbo speed: 150 km/h. */
+  turboSpeed: 150 / 3.6,
+  /** Acceleration towards the turbo speed. */
+  turboAccel: 40,
   /** Minimum wheelie amount needed to hop over a vehicle instead of crashing into it. */
   wheelieHopMin: 0.5,
   /** Take-off vertical speed range when hopping over a vehicle from a wheelie. */
@@ -65,6 +71,8 @@ export interface BikeState {
   route: number;
   /** > 0 while the explosive bonus is active: vehicles hit blow up instead of knocking the rider down. */
   explosive: number;
+  /** > 0 while the turbo bonus is active: rockets push the bike to turbo speed and it jumps over every vehicle. */
+  turbo: number;
   /** Id of the vehicle the bike is hopping over from a wheelie (-1 = none). */
   hopOver: number;
 }
@@ -86,13 +94,14 @@ export const createBike = (s = 0, d = 3): BikeState => ({
   crashes: 0,
   route: -1,
   explosive: 0,
+  turbo: 0,
   hopOver: -1,
 });
 
 export const isCrashed = (b: BikeState): boolean => b.crashTimer > 0;
 
 export const effectiveTopSpeed = (b: BikeState, stats: CharacterStats): number =>
-  stats.topSpeed * (b.wheelie > 0.5 ? BIKE.wheelieBoost : 1);
+  b.turbo > 0 ? BIKE.turboSpeed : stats.topSpeed * (b.wheelie > 0.5 ? BIKE.wheelieBoost : 1);
 
 export const crashBike = (
   b: BikeState,
@@ -108,6 +117,7 @@ export const crashBike = (
   b.wheelie = 0;
   b.wheelieTime = 0;
   b.hopOver = -1;
+  b.turbo = 0;
   events.push({ type: 'crash', cause });
 };
 
@@ -173,6 +183,7 @@ export const stepBike = (
 ): void => {
   b.invulnerable = Math.max(0, b.invulnerable - dt);
   b.explosive = Math.max(0, b.explosive - dt);
+  b.turbo = Math.max(0, b.turbo - dt);
   b.wheelieCooldown = Math.max(0, b.wheelieCooldown - dt);
 
   if (b.crashTimer > 0) {
@@ -218,7 +229,10 @@ export const stepBike = (
   // --- Longitudinal ----------------------------------------------------
   const top = effectiveTopSpeed(b, stats);
   if (!b.airborne) {
-    if (input.brake > 0 && b.speed > 0.2) {
+    if (b.turbo > 0) {
+      // Rockets lit: full thrust to turbo speed, whatever the controls.
+      b.speed = approach(b.speed, BIKE.turboSpeed, BIKE.turboAccel * dt);
+    } else if (input.brake > 0 && b.speed > 0.2) {
       b.speed -= BIKE.brakeDecel * input.brake * dt;
       if (b.speed < 0) b.speed = 0;
     } else if (input.brake > 0 && input.throttle === 0) {
