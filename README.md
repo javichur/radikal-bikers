@@ -8,6 +8,26 @@ _Radikal Bikers_ (Gaelco, 1998). Todo el arte, el audio y el código son origina
 > **Centro Histórico**, **Zona Industrial** y **Carretera de la Colina**) y 2 repartidores (**Rocco** y **Luna**), en
 > español e inglés.
 
+## 🏍️ ¡Juega ya!
+
+**👉 [Jugar a Radikal Riders en el navegador](https://javichur.github.io/radikal-bikers/leoGjAW41OH-fIkg/)** — funciona
+en escritorio (teclado o mando) y en móvil (controles táctiles).
+
+## 🎬 Vídeo demo
+
+[![Vídeo demo de Radikal Riders](https://img.youtube.com/vi/Ds_wtQz6IG0/hqdefault.jpg)](https://youtu.be/Ds_wtQz6IG0)
+
+## 🏛️ Pantalla de València
+
+El juego incluye una pantalla inspirada en **València**, en plenas Fallas, con monumentos de la ciudad: la Ciutat de les
+Arts i les Ciències (Hemisfèric, Umbracle, Museu de les Ciències y Palau de les Arts), el Jardí del Túria, las Torres de
+Serrans, la Catedral y el Micalet, el Mercat Central, la Llotja, el Ajuntament, la Estació del Nord, la Plaça de Bous, el
+Mercat de Colón y la Porta de la Mar, entre otros.
+
+## 🤖 Cómo se hizo
+
+Juego hecho el 26 de septiembre de 2026 con la app de **GitHub Copilot para iPhone** y el modelo **Claude Opus 5.5**.
+
 ## Cómo jugar
 
 Reparte la pizza antes de que se acabe el tiempo. Cada **CHECKPOINT** suma tiempo extra. Esquiva coches, taxis,
