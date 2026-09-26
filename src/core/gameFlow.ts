@@ -75,6 +75,7 @@ export class GameFlow {
     const wrap = (i: number, n: number): number => ((i % n) + n) % n;
     if (action === 'restart') {
       const inRace: readonly Screen[] = ['countdown', 'racing', 'paused', 'continue', 'gameOver', 'finished'];
+      if ((this.screen === 'gameOver' || this.screen === 'finished') && this.resultLock > 0) return null;
       return inRace.includes(this.screen) ? this.restart() : null;
     }
     switch (this.screen) {
@@ -181,6 +182,7 @@ export class GameFlow {
   /** Results screen button: play again or back to the title. */
   selectResult(item: 'again' | 'menu'): FlowEffect | null {
     if (this.screen !== 'gameOver' && this.screen !== 'finished') return null;
+    if (this.resultLock > 0) return null;
     if (item === 'again') return this.restart();
     this.go('title');
     return { type: 'quitRace' };

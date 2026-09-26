@@ -97,8 +97,9 @@ export const isGhostData = (v: unknown): v is GhostData => {
   return (
     g.version === 1 &&
     typeof g.time === 'number' &&
+    Number.isFinite(g.time) &&
     Array.isArray(g.splits) &&
-    g.splits.every((x) => typeof x === 'number') &&
+    g.splits.every((x) => typeof x === 'number' && Number.isFinite(x)) &&
     Array.isArray(g.frames) &&
     g.frames.length % STRIDE === 0 &&
     g.frames.every((x) => typeof x === 'number' && Number.isFinite(x))

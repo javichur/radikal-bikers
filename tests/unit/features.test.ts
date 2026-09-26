@@ -138,6 +138,8 @@ describe('ghost', () => {
     expect(isGhostData(null)).toBe(false);
     expect(isGhostData({ version: 1, time: 1, splits: [], frames: [1, 2, 3] })).toBe(false);
     expect(isGhostData({ version: 2, time: 1, splits: [], frames: [] })).toBe(false);
+    expect(isGhostData({ version: 1, time: Number.NaN, splits: [], frames: [] })).toBe(false);
+    expect(isGhostData({ version: 1, time: 1, splits: [Infinity], frames: [] })).toBe(false);
     expect(ghostPose({ version: 1, time: 0, splits: [], frames: [] }, 1)).toBeNull();
   });
 });

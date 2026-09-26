@@ -29,7 +29,7 @@ Cada truco suma puntos base a un combo pendiente; si en 3 s no llega otro truco,
 | Truco                                      | Puntos base |
 | ------------------------------------------ | ----------- |
 | A un pelo (pasar a < 1,1 m de un vehículo) | 250         |
-| Caballito (por cada 1,5 s seguidos)        | 150         |
+| Caballito (mantener ≥ 1 s seguidos)        | 150         |
 | Salto (escala con el tiempo en el aire)    | 200         |
 | Cristal roto                               | 300         |
 | Atajo completado                           | 500         |

@@ -116,11 +116,13 @@ describe('GameFlow', () => {
     const f = flow();
     toRacing(f);
     f.notifyFinished();
+    expect(f.selectResult('menu')).toBeNull();
     f.update(RESULT_LOCK_SECONDS);
     expect(f.handle('confirm')).toEqual({ type: 'restartRace' });
     expect(f.screen).toBe('countdown');
     f.update(COUNTDOWN_SECONDS + 0.01);
     f.notifyFinished();
+    f.update(RESULT_LOCK_SECONDS);
     expect(f.selectResult('menu')).toEqual({ type: 'quitRace' });
     expect(f.screen).toBe('title');
     expect(f.selectResult('again')).toBeNull();
@@ -137,6 +139,8 @@ describe('GameFlow', () => {
     expect(f.handle('restart')).toEqual({ type: 'restartRace' });
     f.update(COUNTDOWN_SECONDS + 0.01);
     f.notifyFinished();
+    expect(f.handle('restart')).toBeNull();
+    f.update(RESULT_LOCK_SECONDS);
     expect(f.handle('restart')).toEqual({ type: 'restartRace' });
   });
 
