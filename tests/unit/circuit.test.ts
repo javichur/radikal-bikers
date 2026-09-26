@@ -4,6 +4,7 @@ import { STAGES } from '../../src/content/stages';
 import { FIXED_DT } from '../../src/core/loop';
 import { BIKE } from '../../src/sim/bike';
 import type { SimEvent } from '../../src/sim/events';
+import { inRiver, riverOf } from '../../src/sim/scenery';
 import { ROUTE_HALF_WIDTH, SIDEWALK } from '../../src/sim/shortcuts';
 import { profileHeight, Track } from '../../src/sim/track';
 import { EXPLODE_POINTS, World } from '../../src/sim/world';
@@ -298,5 +299,33 @@ describe('hills', () => {
     run(climb, 1.5, controls());
     run(flat, 1.5, controls());
     expect(climb.bike.speed).toBeLessThan(flat.bike.speed - 1);
+  });
+});
+
+describe('river under the bridge', () => {
+  it('only crosses the main road on the bridge span and never touches a shortcut', () => {
+    const w = newWorld();
+    const L = w.track.length;
+    for (const b of stage.bridges) {
+      const river = riverOf(w.track, b);
+      for (let s = 0; s < L; s += 2) {
+        for (const d of [-stage.roadHalfWidth - SIDEWALK, 0, stage.roadHalfWidth + SIDEWALK]) {
+          const p = w.track.toWorld(s, d);
+          if (inRiver(river, p.x, p.z)) {
+            expect(s).toBeGreaterThan(b.from * L);
+            expect(s).toBeLessThan(b.to * L);
+            expect(w.track.sample(s).y).toBeGreaterThan(4);
+          }
+        }
+      }
+      for (const r of w.routes) {
+        for (let s = 0; s < r.track.length; s += 2) {
+          for (const d of [-ROUTE_HALF_WIDTH, 0, ROUTE_HALF_WIDTH]) {
+            const p = r.track.toWorld(s, d);
+            expect(inRiver(river, p.x, p.z)).toBe(false);
+          }
+        }
+      }
+    }
   });
 });
