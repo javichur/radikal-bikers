@@ -54,6 +54,31 @@ describe('UpdateChecker', () => {
     await second.checker.check();
     expect(second.reload).not.toHaveBeenCalled();
   });
+
+  it('replaces a pending update with a newer deployed version', async () => {
+    const remotes = ['v2', 'v3'];
+    const state = { screen: 'racing' as Screen };
+    const reload = vi.fn();
+    const storage = memory();
+    const checker = new UpdateChecker({
+      current: 'v1',
+      fetchVersion: () => Promise.resolve(remotes.shift() ?? null),
+      getScreen: () => state.screen,
+      reload,
+      storage,
+    });
+
+    await checker.check();
+    await checker.check();
+    expect(checker.updatePending).toBe(true);
+    state.screen = 'title';
+    checker.onScreen(state.screen);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    const latest = setup('v3', 'title', storage);
+    await latest.checker.check();
+    expect(latest.reload).not.toHaveBeenCalled();
+  });
 });
 
 describe('fetchDeployedVersion', () => {

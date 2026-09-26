@@ -31,7 +31,7 @@ export class UpdateChecker {
   }
 
   async check(): Promise<void> {
-    if (this.pending || this.checking) return;
+    if (this.checking) return;
     this.checking = true;
     try {
       const remote = await this.opts.fetchVersion();

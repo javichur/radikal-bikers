@@ -65,7 +65,7 @@ export class Game {
     window.addEventListener('pointerdown', () => this.audio.unlock(), { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.flow.screen === 'racing') this.onMenu('pause');
-      void this.updates?.check();
+      if (!document.hidden) void this.updates?.check();
     });
 
     if (!import.meta.env.DEV && !params.has('e2e')) {
