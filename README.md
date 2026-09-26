@@ -54,4 +54,20 @@ Parámetros de URL útiles: `?quality=low` (sin sombras ni antialiasing, resoluc
 
 El build usa `base: './'`, por lo que `dist/` puede alojarse en cualquier servidor estático o subcarpeta.
 
+## Publicación en GitHub Pages (URL difícil de adivinar)
+
+El workflow `.github/workflows/pages.yml` publica el juego en cada push a `main` (o manualmente desde _Actions_) bajo
+una ruta secreta: `https://<usuario>.github.io/<repo>/<SECRETO>/`. La raíz del sitio solo sirve una página vacía y todo
+lleva `noindex` / `robots.txt` para que los buscadores no lo indexen.
+
+Configuración (una sola vez):
+
+1. _Settings → Pages → Build and deployment → Source_: **GitHub Actions**.
+2. _Settings → Secrets and variables → Actions → New repository secret_: `PAGES_SECRET_PATH` con un valor aleatorio de
+   al menos 16 caracteres `[A-Za-z0-9_-]` (p. ej. `openssl rand -hex 16`).
+3. Lanzar el workflow _Deploy to GitHub Pages_. Para cambiar la URL, cambia el secreto y vuelve a lanzarlo.
+
+> ⚠️ Es ocultación, no control de acceso: cualquiera que tenga el enlace puede jugar. Con repositorio privado, GitHub
+> Pages requiere plan Pro (o superior).
+
 Más información en [docs/architecture.md](docs/architecture.md) y [docs/game-design.md](docs/game-design.md).
