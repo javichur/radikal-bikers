@@ -48,6 +48,18 @@ describe('bike model', () => {
       for (let i = 0; i < 2; i++) expect(hands[i]!.distanceTo(grips[i]!)).toBeLessThan(0.06);
     }
   });
+
+  it('puts the helmet visor at the front of the head, facing the road', () => {
+    const rig = buildBike(CHARACTERS[0]!);
+    rig.root.updateMatrixWorld(true);
+    const helmet = rig.rider.getObjectByName('helmet')!;
+    const visor = helmet.getObjectByName('visor')!;
+    const centre = helmet.getWorldPosition(new THREE.Vector3());
+    const box = new THREE.Box3().setFromObject(visor);
+    const mid = box.getCenter(new THREE.Vector3());
+    expect(mid.z - centre.z).toBeGreaterThan(0.15);
+    expect(Math.abs(mid.x - centre.x)).toBeLessThan(0.01);
+  });
 });
 
 describe('city builder', () => {

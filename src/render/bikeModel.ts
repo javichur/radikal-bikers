@@ -105,6 +105,88 @@ class Segment {
 /** Sphere joint used to hide the seams between limb segments. */
 const joint = (r: number, color: number): THREE.Mesh => mesh(new THREE.SphereGeometry(r, 10, 8), color);
 
+/** Shell proportions of the helmet (narrower than long, like a real full-face lid). */
+const HELMET_SCALE = new THREE.Vector3(0.94, 1, 1.12);
+
+/** Patch of the helmet surface: `phi` around the vertical axis (π/2 = straight ahead), `theta` down from the crown. */
+const helmetPatch = (r: number, phi0: number, phi1: number, theta0: number, theta1: number): THREE.SphereGeometry =>
+  new THREE.SphereGeometry(r, 20, 8, phi0, phi1 - phi0, theta0, theta1 - theta0);
+
+/** Full-face helmet: shell, chin bar, eye port gasket, tinted visor with pivots, vents, spoiler and neck roll. */
+const helmetModel = (color: number, accent: number): THREE.Group => {
+  const g = new THREE.Group();
+  g.name = 'helmet';
+  const fitted = (m: THREE.Mesh, k: number): THREE.Mesh => {
+    m.scale.copy(HELMET_SCALE).multiplyScalar(k);
+    return m;
+  };
+  const front = Math.PI / 2;
+  // Shell, open at the bottom where the neck goes in.
+  const shell = fitted(mesh(new THREE.SphereGeometry(0.2, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.8), color), 1);
+  shell.material = toon(color, { side: THREE.DoubleSide });
+  g.add(withOutline(shell, 0.05));
+  // Chin bar blending into the shell.
+  const chin = mesh(new THREE.SphereGeometry(0.16, 18, 12), color);
+  chin.scale.set(1, 0.6, 0.95);
+  chin.position.set(0, -0.1, 0.075);
+  g.add(withOutline(chin, 0.04));
+  // Rubber gasket around the eye port, then the smoked visor and a glint across it.
+  g.add(
+    fitted(
+      mesh(helmetPatch(0.2, front - Math.PI * 0.33, front + Math.PI * 0.33, Math.PI * 0.35, Math.PI * 0.62), DARK),
+      1.012,
+    ),
+  );
+  const visor = fitted(
+    mesh(helmetPatch(0.2, front - Math.PI * 0.31, front + Math.PI * 0.31, Math.PI * 0.37, Math.PI * 0.6), 0x2a3b55),
+    1.03,
+  );
+  visor.name = 'visor';
+  visor.material = toon(0x2a3b55, { emissive: 0x0b1a2a, side: THREE.DoubleSide });
+  g.add(visor);
+  const glint = fitted(
+    mesh(helmetPatch(0.2, front - Math.PI * 0.2, front + Math.PI * 0.04, Math.PI * 0.41, Math.PI * 0.44), 0xcfe8ff, {
+      emissive: 0x4a6a8a,
+    }),
+    1.036,
+  );
+  g.add(glint);
+  // Visor pivots on both sides.
+  for (const side of [-1, 1]) {
+    const pivot = mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.02, 12), 0x343a40);
+    pivot.rotation.z = Math.PI / 2;
+    pivot.position.set(side * 0.186, -0.01, 0.03);
+    g.add(pivot);
+  }
+  // Crown vents, chin vent and rear spoiler.
+  for (const side of [-1, 1]) {
+    const vent = mesh(new THREE.BoxGeometry(0.035, 0.02, 0.07), DARK);
+    vent.position.set(side * 0.05, 0.19, 0.06);
+    vent.rotation.x = 0.35;
+    g.add(vent);
+  }
+  const chinVent = mesh(new THREE.BoxGeometry(0.07, 0.035, 0.02), DARK);
+  chinVent.position.set(0, -0.1, 0.225);
+  chinVent.rotation.x = -0.2;
+  g.add(chinVent);
+  const spoiler = mesh(new THREE.BoxGeometry(0.15, 0.025, 0.08), accent);
+  spoiler.position.set(0, 0.12, -0.2);
+  spoiler.rotation.x = 0.6;
+  g.add(withOutline(spoiler, 0.02));
+  // Centre stripe from the spoiler over the crown, stopping above the visor.
+  const stripe = mesh(new THREE.TorusGeometry(0.2, 0.02, 4, 24, Math.PI * 0.7), accent);
+  stripe.rotation.y = Math.PI / 2;
+  stripe.scale.set(HELMET_SCALE.z * 1.01, 1.01, 1);
+  g.add(stripe);
+  // Padded neck roll at the bottom opening.
+  const roll = mesh(new THREE.TorusGeometry(0.115, 0.03, 8, 20), DARK);
+  roll.rotation.x = Math.PI / 2;
+  roll.scale.set(0.94, 1.12, 1);
+  roll.position.y = -0.155;
+  g.add(roll);
+  return g;
+};
+
 /** Two-bone IK: elbow/knee position for a limb from `a` to `b`, bending towards `pole`. */
 export const solveTwoBone = (
   a: THREE.Vector3,
@@ -450,32 +532,10 @@ export const buildBike = (c: CharacterDef): BikeRig => {
     new THREE.Vector3(0, 1.7, -0.08),
   );
   rider.add(neck.group);
-  // Helmet with visor, chin guard and stripe.
-  const headPos = new THREE.Vector3(0, 1.8, -0.05);
-  const shell = mesh(new THREE.SphereGeometry(0.2, 18, 14), helmet);
-  shell.scale.set(1, 1.02, 1.1);
-  shell.position.copy(headPos);
-  rider.add(withOutline(shell, 0.05));
-  const visor = mesh(
-    new THREE.SphereGeometry(0.205, 16, 8, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.36, Math.PI * 0.22),
-    0x1b263b,
-    {
-      emissive: 0x0b1a2a,
-    },
-  );
-  visor.material = toon(0x1b263b, { emissive: 0x0b1a2a, side: THREE.DoubleSide });
-  visor.scale.set(1.02, 1.02, 1.12);
-  visor.position.copy(headPos);
-  rider.add(visor);
-  const chin = mesh(new THREE.TorusGeometry(0.13, 0.04, 6, 14, Math.PI), helmet);
-  chin.rotation.set(Math.PI / 2 + 0.2, 0, 0);
-  chin.position.set(0, 1.68, 0.03);
-  rider.add(chin);
-  const stripe = mesh(new THREE.TorusGeometry(0.205, 0.022, 4, 24, Math.PI), bodyColor);
-  stripe.rotation.y = Math.PI / 2;
-  stripe.scale.set(1, 1.02, 1.1);
-  stripe.position.copy(headPos);
-  rider.add(stripe);
+  const head = helmetModel(helmet, bodyColor);
+  head.position.set(0, 1.8, -0.05);
+  head.rotation.x = 0.1;
+  rider.add(head);
 
   // Legs: thighs along the seat, shins down to the floorboard, boots on the deck.
   for (const side of [-1, 1]) {
