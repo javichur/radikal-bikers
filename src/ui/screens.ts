@@ -109,10 +109,23 @@ const statBar = (label: string, value: number): HTMLElement =>
     h('span', { class: 'stat-bar' }, h('span', { class: 'stat-fill', style: `width:${Math.round(value * 100)}%` })),
   );
 
+/** Scrolls `list` the least needed so `item` is fully visible (works for vertical and horizontal lists). */
+const keepInView = (list: HTMLElement, item: HTMLElement | undefined): void => {
+  if (!item) return;
+  const l = list.getBoundingClientRect();
+  const r = item.getBoundingClientRect();
+  if (r.top < l.top) list.scrollTop -= l.top - r.top;
+  else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+  if (r.left < l.left) list.scrollLeft -= l.left - r.left;
+  else if (r.right > l.right) list.scrollLeft += r.right - l.right;
+};
+
 /** Renders menu/overlay screens into `root` as plain DOM. */
 export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenContext, cb: ScreenCallbacks): void => {
   const { i18n, flow } = ctx;
   const t = i18n.t.bind(i18n);
+  const previousList = root.querySelector<HTMLElement>('.stage-list');
+  const scroll = previousList ? { top: previousList.scrollTop, left: previousList.scrollLeft } : null;
   root.replaceChildren();
   root.dataset.screen = screen;
 
@@ -229,45 +242,80 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
       break;
     }
     case 'stageSelect': {
-      const cards = STAGES.map((s, i) => {
+      // Master–detail: a compact, scrollable list of every stage plus the full details of the highlighted one,
+      // so the screen fits small landscape phones and keeps scaling as more stages are added.
+      const difficultyText = (d: number): string => '★'.repeat(d) + '☆'.repeat(MAX_DIFFICULTY - d);
+      const tiles = STAGES.map((s, i) => {
         const locked = ctx.isLocked('stage', i);
-        const stars = ctx.starsOf(s.id);
-        const best = ctx.bestOf(s.id);
+        const selected = i === flow.stageIndex;
         return h(
-          'div',
+          'li',
           {
-            class: `card stage-card${i === flow.stageIndex ? ' selected' : ''}${locked ? ' locked' : ''}${s.theme.night ? ' night' : ''}`,
+            class: `stage-tile${selected ? ' selected' : ''}${locked ? ' locked' : ''}${s.theme.night ? ' night' : ''}`,
             'data-stage': s.id,
+            role: 'option',
+            'aria-selected': selected ? 'true' : 'false',
             onclick: () => cb.selectStage(i),
           },
-          h('h2', {}, i18n.tk(s.nameKey)),
-          h('p', { class: 'stars' }, starsText(stars, s.challenges.length)),
-          locked ? h('p', { class: 'lock' }, `🔒 ${t('stage.locked', { n: s.unlockStars })}`) : null,
+          h('span', { class: 'tile-name' }, `${locked ? '🔒 ' : ''}${i18n.tk(s.nameKey)}`),
           h(
-            'p',
-            { class: 'meta difficulty', title: `${t('stage.difficulty')}: ${s.difficulty}/${MAX_DIFFICULTY}` },
-            `${t('stage.difficulty')}: `,
-            h('span', { class: 'stars' }, '★'.repeat(s.difficulty) + '☆'.repeat(MAX_DIFFICULTY - s.difficulty)),
+            'span',
+            { class: 'tile-info' },
+            h('span', { class: 'stars' }, starsText(ctx.starsOf(s.id), s.challenges.length)),
+            h(
+              'span',
+              { class: 'tile-difficulty', title: `${t('stage.difficulty')}: ${s.difficulty}/${MAX_DIFFICULTY}` },
+              difficultyText(s.difficulty),
+            ),
           ),
-          h('p', { class: 'bio' }, i18n.tk(s.descriptionKey)),
-          h('p', { class: 'meta' }, `${t('stage.length')}: ${((ctx.stageLengths[i] ?? 0) / 1000).toFixed(1)} km`),
-          h('p', { class: 'meta' }, `${t('stage.checkpoints')}: ${s.checkpoints.length}`),
-          h(
-            'p',
-            { class: 'meta' },
-            `${t('stage.shortcutsFound')}: ${countBits(ctx.discoveredOf(s.id))}/${s.shortcuts.length}`,
-          ),
-          best !== null ? h('p', { class: 'meta' }, `${t('title.best')}: ${best}`) : null,
-          h('p', { class: 'meta' }, t('stage.challenges')),
-          challengeList(i18n, s, stars),
         );
       });
+      const i = flow.stageIndex;
+      const s = STAGES[i]!;
+      const locked = ctx.isLocked('stage', i);
+      const stars = ctx.starsOf(s.id);
+      const best = ctx.bestOf(s.id);
+      const fact = (label: string, value: string): HTMLElement =>
+        h('div', { class: 'fact' }, h('dt', {}, label), h('dd', {}, value));
+      const detail = h(
+        'div',
+        {
+          class: `card stage-card stage-detail${locked ? ' locked' : ''}${s.theme.night ? ' night' : ''}`,
+          'data-testid': 'stage-detail',
+          'data-detail': s.id,
+        },
+        h(
+          'div',
+          { class: 'detail-head' },
+          h('h2', {}, i18n.tk(s.nameKey)),
+          h('span', { class: 'counter' }, `${i + 1}/${STAGES.length}`),
+        ),
+        locked ? h('p', { class: 'lock' }, `🔒 ${t('stage.locked', { n: s.unlockStars })}`) : null,
+        h(
+          'p',
+          { class: 'meta difficulty', title: `${t('stage.difficulty')}: ${s.difficulty}/${MAX_DIFFICULTY}` },
+          `${t('stage.difficulty')}: `,
+          h('span', { class: 'stars' }, difficultyText(s.difficulty)),
+        ),
+        h('p', { class: 'bio' }, i18n.tk(s.descriptionKey)),
+        h(
+          'dl',
+          { class: 'facts' },
+          fact(t('stage.length'), `${((ctx.stageLengths[i] ?? 0) / 1000).toFixed(1)} km`),
+          fact(t('stage.checkpoints'), String(s.checkpoints.length)),
+          fact(t('stage.shortcutsFound'), `${countBits(ctx.discoveredOf(s.id))}/${s.shortcuts.length}`),
+          best !== null ? fact(t('title.best'), String(best)) : null,
+        ),
+        h('p', { class: 'meta challenges-title' }, `${t('stage.challenges')} ${starsText(stars, s.challenges.length)}`),
+        challengeList(i18n, s, stars),
+      );
+      const list = h('ul', { class: 'stage-list', role: 'listbox', 'aria-label': t('select.stage') }, ...tiles);
       root.append(
         h(
           'div',
-          { class: 'panel select-screen' },
+          { class: 'panel select-screen stage-select' },
           h('h1', { class: 'screen-title' }, t('select.stage')),
-          h('div', { class: 'cards stage-cards' }, ...cards),
+          h('div', { class: 'stage-body' }, list, detail),
           h(
             'div',
             { class: 'actions' },
@@ -276,6 +324,11 @@ export const renderScreen = (root: HTMLElement, screen: Screen, ctx: ScreenConte
           ),
         ),
       );
+      if (scroll) {
+        list.scrollTop = scroll.top;
+        list.scrollLeft = scroll.left;
+      }
+      keepInView(list, tiles[i]);
       break;
     }
     case 'paused': {
