@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { challengeDone, challengeMask, countBits, gradeFor, type RunSummary } from '../../src/content/challenges';
 import { CHARACTERS } from '../../src/content/characters';
 import { levelFor, levelProgress, MAX_LEVEL, paintUnlocked, PAINTS, xpForLevel } from '../../src/content/progression';
-import { STAGES } from '../../src/content/stages';
+import { getStage, STAGES } from '../../src/content/stages';
 import {
   addTrick,
   bankCombo,
@@ -88,7 +88,7 @@ describe('challenges and grades', () => {
   });
 
   it('builds star masks', () => {
-    const list = STAGES[0]!.challenges;
+    const list = getStage('beach').challenges;
     const mask = challengeMask(list, summary({ crashes: 1, shortcuts: 5, maxWheelie: 9 }));
     expect(countBits(mask)).toBe(list.length - 1);
     expect(countBits(0b1011)).toBe(3);
@@ -183,7 +183,7 @@ describe('roadworks', () => {
 });
 
 describe('world tricks', () => {
-  const stage = STAGES[0]!;
+  const stage = getStage('beach');
 
   it('rewards a near miss with a trick', () => {
     const w = new World(stage, CHARACTERS[0]!);

@@ -48,7 +48,7 @@ test.describe('desktop', () => {
     await expect(page.locator('[data-character=nitro]')).toHaveClass(/locked/);
     await page.keyboard.press('Enter');
     await expect(page.locator('[data-stage=harborNight]')).toHaveClass(/locked/);
-    await expect(page.locator('[data-stage=valencia]')).toHaveClass(/locked/);
+    await expect(page.locator('[data-stage=valencia]')).not.toHaveClass(/locked/);
     await expect(page.getByTestId('stage-detail').locator('.challenges li')).toHaveCount(3);
     await page.keyboard.press('Enter');
     await expect(screen(page)).toHaveAttribute('data-screen', 'racing', { timeout: 30_000 });
