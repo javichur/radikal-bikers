@@ -1,0 +1,57 @@
+name: Deploy to GitHub Pages
+
+# Publishes the game under a hard-to-guess sub-path taken from the
+# PAGES_SECRET_PATH repository secret: https://<user>.github.io/<repo>/<secret>/
+# The site root only serves an empty page. This is obscurity, not access control.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Assemble site under secret path
+        env:
+          SECRET_PATH: ${{ secrets.PAGES_SECRET_PATH }}
+        run: |
+          if ! [[ "$SECRET_PATH" =~ ^[A-Za-z0-9_-]{16,}$ ]]; then
+            echo "::error::PAGES_SECRET_PATH must be set to at least 16 characters of [A-Za-z0-9_-]"
+            exit 1
+          fi
+          mkdir -p "_site/$SECRET_PATH"
+          cp -r dist/. "_site/$SECRET_PATH/"
+          touch _site/.nojekyll
+          printf 'User-agent: *\nDisallow: /\n' > _site/robots.txt
+          printf '<!doctype html><meta name="robots" content="noindex, nofollow"><title></title>\n' > _site/index.html
+          cp _site/index.html _site/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
